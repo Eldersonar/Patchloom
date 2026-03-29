@@ -16,12 +16,15 @@ import {
 } from "../src/workflows/pr-review-workflow";
 
 class StubModelProvider implements ModelProvider {
+  private readonly objectListMode: boolean;
+
   private readonly structuredFailureCount: number;
 
   private structuredAttempt = 0;
 
-  public constructor(structuredFailureCount = 0) {
+  public constructor(structuredFailureCount = 0, objectListMode = false) {
     this.structuredFailureCount = structuredFailureCount;
+    this.objectListMode = objectListMode;
   }
 
   public async generateText(
@@ -54,10 +57,19 @@ class StubModelProvider implements ModelProvider {
     };
   }
 
-  private resolvePayload(prompt: string): { items: string[] } {
+  private resolvePayload(prompt: string): { items: unknown[] } {
     const lowerPrompt = prompt.toLowerCase();
 
     if (lowerPrompt.includes("risk")) {
+      if (this.objectListMode) {
+        return {
+          items: [
+            { text: "Token expiry edge case on refresh boundary." },
+            { text: "Stale profile cache after logout/login." }
+          ]
+        };
+      }
+
       return {
         items: [
           "Token expiry edge case on refresh boundary.",
@@ -67,10 +79,31 @@ class StubModelProvider implements ModelProvider {
     }
 
     if (lowerPrompt.includes("test suggestions")) {
+      if (this.objectListMode) {
+        return {
+          items: [
+            { description: "Regression test for token refresh expiry handling." },
+            {
+              description: "E2E test for logout/login after profile update.",
+              title: "E2E"
+            }
+          ]
+        };
+      }
+
       return {
         items: [
           "Regression test for token refresh when refresh token expires.",
           "E2E test for logout/login after profile update."
+        ]
+      };
+    }
+
+    if (this.objectListMode) {
+      return {
+        items: [
+          { content: "Add follow-up issue for cache invalidation assumptions." },
+          { content: "Document auth refresh rollback procedure." }
         ]
       };
     }
@@ -156,5 +189,18 @@ describe("pr-review-workflow", () => {
     });
 
     expect(confidence).toBe(0.95);
+  });
+
+  it("normalizes object list items returned by provider", async () => {
+    const provider = new StubModelProvider(0, true);
+
+    const result = await runPullRequestReviewWorkflow({
+      input: BASE_INPUT,
+      provider
+    });
+
+    expect(result.output.risks[0]).toContain("Token expiry");
+    expect(result.output.suggestedTests[0]).toContain("Regression test");
+    expect(result.output.followUpTasks[0]).toContain("follow-up issue");
   });
 });

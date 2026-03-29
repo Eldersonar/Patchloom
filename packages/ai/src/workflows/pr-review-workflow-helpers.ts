@@ -2,9 +2,41 @@ import { z } from "zod";
 
 import type { PullRequestReviewWorkflowInput } from "./pr-review-workflow";
 
-export const LIST_OUTPUT_SCHEMA = z.object({
-  items: z.array(z.string().min(1)).min(1).max(10)
-});
+export const LIST_OUTPUT_SCHEMA = z
+  .object({
+    items: z.array(z.unknown()).min(1).max(10)
+  })
+  .transform((payload, context) => {
+    const normalizedItems: string[] = [];
+
+    payload.items.forEach((item, index) => {
+      const normalized = normalizeListItem(item);
+
+      if (!normalized) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "Unable to normalize item into string. Provide plain string items.",
+          path: ["items", index]
+        });
+        return;
+      }
+
+      normalizedItems.push(normalized);
+    });
+
+    if (normalizedItems.length === 0) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "No valid list items were returned after normalization.",
+        path: ["items"]
+      });
+    }
+
+    return {
+      items: normalizedItems
+    };
+  });
 
 export function buildSummaryPrompt(input: PullRequestReviewWorkflowInput): string {
   return [
@@ -101,4 +133,93 @@ export function normalizeConfidence(score: number): number {
   }
 
   return Math.round(score * 100) / 100;
+}
+
+/**
+ * Normalizes unknown model list items into concise strings.
+ *
+ * @param item - Unknown model item payload.
+ * @returns Normalized string item or null when it cannot be normalized.
+ */
+function normalizeListItem(item: unknown): string | null {
+  const direct = normalizePrimitiveToString(item);
+
+  if (direct) {
+    return direct;
+  }
+
+  if (Array.isArray(item)) {
+    const parts = item
+      .map((entry) => normalizeListItem(entry))
+      .filter((entry): entry is string => Boolean(entry));
+
+    if (parts.length > 0) {
+      return parts.join("; ");
+    }
+
+    return null;
+  }
+
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+
+  const objectItem = item as Record<string, unknown>;
+  const title = normalizePrimitiveToString(objectItem.title);
+  const description = normalizePrimitiveToString(objectItem.description);
+
+  if (title && description) {
+    return `${title}: ${description}`;
+  }
+
+  const preferredKeyOrder = [
+    "text",
+    "content",
+    "summary",
+    "title",
+    "description",
+    "risk",
+    "test",
+    "task",
+    "name",
+    "label",
+    "reason"
+  ];
+
+  for (const key of preferredKeyOrder) {
+    const normalized = normalizePrimitiveToString(objectItem[key]);
+
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  for (const value of Object.values(objectItem)) {
+    const nested = normalizeListItem(value);
+
+    if (nested) {
+      return nested;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Converts primitive values into normalized strings.
+ *
+ * @param value - Unknown primitive value.
+ * @returns Trimmed string or null when conversion is not possible.
+ */
+function normalizePrimitiveToString(value: unknown): string | null {
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    return normalized.length > 0 ? normalized : null;
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  return null;
 }

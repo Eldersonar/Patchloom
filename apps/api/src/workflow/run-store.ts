@@ -4,7 +4,6 @@ import {
   canTransitionRunStatus,
   type RunStatus,
   type StartPullRequestReviewInput,
-  type Suggestion,
   type WorkflowRun
 } from "@patchloom/core";
 import { PubSub } from "graphql-subscriptions";
@@ -13,6 +12,13 @@ import {
   createDefaultWorkflowExecutor,
   type PullRequestReviewWorkflowExecutor
 } from "./default-workflow-executor";
+import {
+  createInitialArtifacts,
+  createSuggestionsFromWorkflowOutput,
+  logRunEvent,
+  serializeError,
+  toFailureReason
+} from "./run-store-helpers";
 
 const RUN_UPDATED_EVENT = "runUpdated";
 
@@ -69,7 +75,7 @@ export class InMemoryRunStore {
     const now = new Date().toISOString();
 
     const run: WorkflowRun = {
-      artifacts: this.createInitialArtifacts(),
+      artifacts: createInitialArtifacts(),
       confidence: 0,
       createdAt: now,
       failureReason: null,
@@ -182,50 +188,6 @@ export class InMemoryRunStore {
     });
   }
 
-  private createInitialArtifacts(): WorkflowRun["artifacts"] {
-    return {
-      normalizedOutput: {
-        confidence: 0,
-        followUpTasks: [],
-        risks: [],
-        suggestedTests: [],
-        summary: ""
-      },
-      rawModelResponses: {
-        followUpTasks: "",
-        risks: "",
-        suggestedTests: "",
-        summary: ""
-      }
-    };
-  }
-
-  private createSuggestionsFromWorkflowOutput(
-    run: WorkflowRun,
-    createdAt: string
-  ): Suggestion[] {
-    return [
-      ...run.risks.map((risk) => ({
-        content: risk,
-        createdAt,
-        id: randomUUID(),
-        kind: "risk" as const
-      })),
-      ...run.suggestedTests.map((test) => ({
-        content: test,
-        createdAt,
-        id: randomUUID(),
-        kind: "test" as const
-      })),
-      ...run.followUpTasks.map((task) => ({
-        content: task,
-        createdAt,
-        id: randomUUID(),
-        kind: "follow_up" as const
-      }))
-    ];
-  }
-
   private async executeWorkflow(
     runId: string,
     input: StartPullRequestReviewInput
@@ -262,7 +224,7 @@ export class InMemoryRunStore {
         workflowVersion: workflowResult.output.workflowVersion
       };
 
-      run.suggestions = this.createSuggestionsFromWorkflowOutput(run, updatedAt);
+      run.suggestions = createSuggestionsFromWorkflowOutput(run, updatedAt);
 
       this.runs.set(runId, run);
       this.publishRunUpdated(run);
@@ -328,53 +290,4 @@ export class InMemoryRunStore {
       runId
     });
   }
-}
-
-function toFailureReason(error: unknown): string {
-  if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message.trim();
-  }
-
-  return "Workflow execution failed.";
-}
-
-/**
- * Emits a single-line structured log event for workflow execution.
- *
- * @param event - Event name.
- * @param payload - Event fields.
- */
-function logRunEvent(event: string, payload: Record<string, unknown>): void {
-  if (process.env.NODE_ENV === "test" || process.env.VITEST === "true") {
-    return;
-  }
-
-  console.log(
-    JSON.stringify({
-      event,
-      scope: "workflow_run",
-      timestamp: new Date().toISOString(),
-      ...payload
-    })
-  );
-}
-
-/**
- * Serializes unknown errors for structured logs.
- *
- * @param error - Unknown error value.
- * @returns Serializable error payload.
- */
-function serializeError(error: unknown): Record<string, unknown> {
-  if (error instanceof Error) {
-    return {
-      message: error.message,
-      name: error.name,
-      stack: error.stack
-    };
-  }
-
-  return {
-    value: String(error)
-  };
 }

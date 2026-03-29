@@ -84,6 +84,44 @@ describe("run workflow execution", () => {
 
     runStore.dispose();
   });
+
+  it("formats zod-like validation errors into concise failure reasons", async () => {
+    const runStore = new InMemoryRunStore({
+      autoProgress: true,
+      lifecycleDelayMs: 5,
+      workflowExecutor: async () => {
+        const validationError = new Error("validation failure");
+        Object.assign(validationError, {
+          issues: [
+            {
+              message: "Invalid input: expected string, received object",
+              path: ["items", 0]
+            },
+            {
+              message: "Invalid input: expected string, received object",
+              path: ["items", 1]
+            }
+          ],
+          name: "ZodError"
+        });
+        throw validationError;
+      }
+    });
+
+    const run = runStore.startPullRequestReview({
+      pullRequestNumber: 20,
+      pullRequestTitle: "Improve result parsing",
+      repository: "acme/parsing-service"
+    });
+
+    const failedRun = await waitForRunStatus(runStore, run.id, "failed");
+
+    expect(failedRun.failureReason).toContain(
+      "Model output validation failed at items.0"
+    );
+    expect(failedRun.failureReason).toContain("+1 more issues");
+    runStore.dispose();
+  });
 });
 
 async function waitForRunStatus(
