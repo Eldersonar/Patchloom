@@ -1,107 +1,116 @@
 # AI Engineering Workflow Assistant
 
-An open-source, self-hostable assistant that helps engineering teams and AI agents analyze PRs and issues, assess risk, suggest tests, and manage follow-up actions through a GraphQL control plane.
+Open-source, self-hostable assistant for engineering workflows. It provides a GraphQL control plane plus LangGraph-ready workflow orchestration for PR/issue triage, risk/test suggestions, and approval-gated publishing.
 
-## Status
+## Current Status
+- Phase 0 foundation is implemented.
+- Phase 1 core API skeleton is in progress.
+- Current API includes run operations: `startPullRequestReview`, `getRun`, and `listRuns`.
 
-- Planning and implementation scaffolding in progress.
-- MVP target: PR summary + risk review + suggested tests + approval-gated publishing.
+## Why This Project Exists
+Engineering teams spend too much time on repetitive coordination around code changes:
+- summarizing PRs and issues
+- identifying risk and test gaps
+- converting analysis into follow-up tasks
+- keeping humans and agents aligned on "what happens next"
 
-## Goals
+This project aims to automate first-pass analysis while keeping human approval for risky actions.
 
-- Demonstrate practical AI engineering with LangChain/LangGraph.
-- Provide a GraphQL-first API for human and agent consumers.
-- Keep setup simple for contributors and self-hosting teams.
-- Stay provider-agnostic while starting MVP with Gemini.
-
-## Tech Stack
-
-- Frontend: React (Next.js), TypeScript
-- Backend: Node.js, TypeScript, GraphQL server
-- AI orchestration: LangGraph/LangChain
+## Stack
+- Frontend: React + TypeScript (Vite shell for now)
+- Backend: Node.js + TypeScript + Apollo GraphQL
+- AI orchestration target: LangGraph / LangChain
 - Data: PostgreSQL
 - Queue/pubsub/cache: Redis
-- Containerization: Docker / Docker Compose
+- Containers: Docker Compose
 
-## Key Product Capabilities (MVP)
+## Monorepo Structure
+- `apps/api` GraphQL API service
+- `apps/web` React web shell
+- `packages/config` env parsing and validation
+- `packages/core` shared workflow types
+- `packages/db` DB connection utilities
+- `packages/db/migrations` SQL migration files
+- `.github/workflows/ci.yml` lint/typecheck/test workflow
 
-- Pull request analysis workflow
-  - summary
-  - risk areas
-  - suggested tests
-  - follow-up tasks
-  - confidence score
-- Workflow run tracking with deterministic states
-- Human approval before write actions
-- GraphQL API for queries, mutations, and subscriptions
-- External agent-compatible interfaces (for example, OpenClaw)
+## Implemented Foundations
+- Workspace and package scaffolding with `pnpm`.
+- Typed env validation (`zod`) with tests.
+- API GraphQL skeleton with `health` query and tests.
+- API GraphQL run flow with `startPullRequestReview`, `getRun`, and `listRuns`.
+- In-memory run store for development and test workflows.
+- DB connection check utility with tests.
+- Initial SQL migration and domain model documentation.
+- Docker Compose setup for Postgres and Redis.
+- CI pipeline for lint, typecheck, and tests.
 
-## Architecture Principles
+## Requirements
+- Node.js 22+
+- pnpm 10+
+- Docker + Docker Compose
 
-- Read-only first, write actions later
-- Structured outputs over long unstructured prose
-- Clear service boundaries and modular components
-- No silent failures; explicit state transitions
-- Human approval required before risky or external write actions
-
-## Repository Docs
-
-- Proposal: `/ai-engineering-workflow-assistant-proposal.md`
-- Execution plan: `/implementation-checklist.md`
-- Engineering standards: `/AGENTS.md`
-
-## Quality and Testing Requirements
-
-- Unit tests are required for all functionality.
-- Integration tests are required for all flows and integration boundaries.
-- Provider adapters must pass shared contract tests.
-- New behavior should include tests in the same change set.
-
-## Documentation Requirements
-
-- `README.md` must be kept comprehensive.
-- Update `README.md` whenever features are added, changed, or removed.
-- Keep all docs and source files at or under 300 lines.
-- If a file gets too large, split it into multiple focused files.
-
-## Local Development (Planned)
-
+## Quick Start
 1. Install dependencies:
-
 ```bash
 pnpm install
 ```
-
-2. Start local infrastructure:
-
+2. Copy environment template:
 ```bash
-docker compose up
+cp .env.example .env
+```
+3. Start local dependencies:
+```bash
+docker compose up -d
+```
+4. Validate quality gates:
+```bash
+pnpm lint
+pnpm typecheck
+pnpm test
+```
+5. Run services:
+```bash
+pnpm --filter @patchloom/api dev
+pnpm --filter @patchloom/web dev
 ```
 
-3. Run migrations:
+## Environment Variables
+See `.env.example`.
 
-```bash
-pnpm db:migrate
-```
+Required for current scaffold:
+- `APP_VERSION`
+- `NODE_ENV`
+- `PORT`
+- `MODEL_PROVIDER`
+- `DATABASE_URL`
+- `REDIS_URL`
 
-4. Start development servers:
+## Testing and Quality
+- Unit tests are required for all functionality.
+- Integration tests are required for end-to-end flows and external boundaries.
+- Current checks:
+  - `pnpm lint`
+  - `pnpm typecheck`
+  - `pnpm test`
 
-```bash
-pnpm dev
-```
+## Agent Compatibility
+The architecture is being built for external agent integration (for example, OpenClaw):
+- structured GraphQL operations
+- deterministic run states
+- human approval gates before write actions
 
-Note: Command scripts will be finalized as the monorepo scaffolding is implemented.
+## GraphQL Operations (Current)
+- Query `health`
+- Query `getRun(id: ID!)`
+- Query `listRuns`
+- Mutation `startPullRequestReview(input: StartPullRequestReviewInput!)`
 
-## Roadmap (Short)
-
-1. Monorepo scaffold + Docker dependencies
-2. GraphQL API skeleton + run persistence
-3. Provider-agnostic model interface + Gemini adapter
-4. LangGraph PR workflow
-5. GitHub read-only integration + webhook verification
-6. Approval flow + comment publishing
-7. Agent integration examples and API docs
+## Roadmap (Near-Term)
+1. Run model + persistence schema (`WorkflowRun`, `Suggestion`, approvals)
+2. GraphQL mutations/queries/subscriptions for run lifecycle
+3. Provider-agnostic model interface (Gemini first)
+4. First LangGraph PR summary + risk + test suggestion workflow
+5. GitHub read-only ingestion and webhook verification
 
 ## License
-
 MIT. See [`LICENSE`](/home/simon/Documents/personal/Patchloom/LICENSE).

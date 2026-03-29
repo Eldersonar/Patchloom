@@ -1,0 +1,15 @@
+{
+  "name": "@patchloom/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/connection.ts",
+  "scripts": {
+    "lint": "eslint src test",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
+  }
+}
