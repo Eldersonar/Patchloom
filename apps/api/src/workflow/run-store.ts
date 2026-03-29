@@ -9,11 +9,17 @@ import {
 } from "@patchloom/core";
 import { PubSub } from "graphql-subscriptions";
 
+import {
+  createDefaultWorkflowExecutor,
+  type PullRequestReviewWorkflowExecutor
+} from "./default-workflow-executor";
+
 const RUN_UPDATED_EVENT = "runUpdated";
 
 export interface RunStoreOptions {
   autoProgress?: boolean;
   lifecycleDelayMs?: number;
+  workflowExecutor?: PullRequestReviewWorkflowExecutor;
 }
 
 export interface RunUpdatedEvent {
@@ -33,6 +39,8 @@ export class InMemoryRunStore {
 
   private readonly lifecycleDelayMs: number;
 
+  private readonly workflowExecutor: PullRequestReviewWorkflowExecutor;
+
   private readonly pubSub = new PubSub<RunEventMap>();
 
   private readonly runs = new Map<string, WorkflowRun>();
@@ -47,27 +55,34 @@ export class InMemoryRunStore {
   public constructor(options: RunStoreOptions = {}) {
     this.autoProgress = options.autoProgress ?? true;
     this.lifecycleDelayMs = options.lifecycleDelayMs ?? 100;
+    this.workflowExecutor =
+      options.workflowExecutor ?? createDefaultWorkflowExecutor();
   }
 
   /**
-   * Starts a mock pull request review run and stores the result.
+   * Starts a pull request review run and stores the initial queued state.
    *
    * @param input - Pull request review input payload.
    * @returns Newly created workflow run.
    */
   public startPullRequestReview(input: StartPullRequestReviewInput): WorkflowRun {
     const now = new Date().toISOString();
-    const summary = `PR #${input.pullRequestNumber}: ${input.pullRequestTitle}`;
-    const suggestions = this.createMockSuggestions(input.pullRequestTitle, now);
 
     const run: WorkflowRun = {
+      artifacts: this.createInitialArtifacts(),
+      confidence: 0,
       createdAt: now,
+      followUpTasks: [],
       id: randomUUID(),
+      promptVersion: "pr-review-prompts/v1",
       pullRequestNumber: input.pullRequestNumber,
       repository: input.repository,
+      risks: [],
       status: "queued",
-      suggestions,
-      summary,
+      suggestedTests: [],
+      suggestions: [],
+      summary: `PR #${input.pullRequestNumber}: ${input.pullRequestTitle}`,
+      workflowVersion: "pr-review-workflow/v1",
       updatedAt: now,
       workflowType: "pr_summary"
     };
@@ -76,7 +91,7 @@ export class InMemoryRunStore {
     this.publishRunUpdated(run);
 
     if (this.autoProgress) {
-      this.scheduleAutoProgress(run.id);
+      void this.executeWorkflow(run.id, input);
     }
 
     return run;
@@ -156,33 +171,6 @@ export class InMemoryRunStore {
   }
 
   /**
-   * Creates deterministic mock suggestions for the scaffold workflow.
-   *
-   * @param pullRequestTitle - Pull request title.
-   * @param createdAt - Creation timestamp for generated suggestions.
-   * @returns Generated suggestions array.
-   */
-  private createMockSuggestions(
-    pullRequestTitle: string,
-    createdAt: string
-  ): Suggestion[] {
-    return [
-      {
-        content: `Review edge cases related to: ${pullRequestTitle}`,
-        createdAt,
-        id: randomUUID(),
-        kind: "risk"
-      },
-      {
-        content: "Add regression tests for changed modules.",
-        createdAt,
-        id: randomUUID(),
-        kind: "test"
-      }
-    ];
-  }
-
-  /**
    * Publishes run update events for subscribers.
    *
    * @param run - Updated run payload.
@@ -193,26 +181,104 @@ export class InMemoryRunStore {
     });
   }
 
-  /**
-   * Schedules deterministic status progression for mock workflow runs.
-   *
-   * @param runId - Workflow run identifier.
-   */
-  private scheduleAutoProgress(runId: string): void {
-    const statuses: RunStatus[] = ["running", "waiting_for_approval", "completed"];
+  private createInitialArtifacts(): WorkflowRun["artifacts"] {
+    return {
+      normalizedOutput: {
+        confidence: 0,
+        followUpTasks: [],
+        risks: [],
+        suggestedTests: [],
+        summary: ""
+      },
+      rawModelResponses: {
+        followUpTasks: "",
+        risks: "",
+        suggestedTests: "",
+        summary: ""
+      }
+    };
+  }
 
-    statuses.forEach((nextStatus, index) => {
-      const timer = setTimeout(() => {
-        this.scheduledTimers.delete(timer);
+  private createSuggestionsFromWorkflowOutput(
+    run: WorkflowRun,
+    createdAt: string
+  ): Suggestion[] {
+    return [
+      ...run.risks.map((risk) => ({
+        content: risk,
+        createdAt,
+        id: randomUUID(),
+        kind: "risk" as const
+      })),
+      ...run.suggestedTests.map((test) => ({
+        content: test,
+        createdAt,
+        id: randomUUID(),
+        kind: "test" as const
+      })),
+      ...run.followUpTasks.map((task) => ({
+        content: task,
+        createdAt,
+        id: randomUUID(),
+        kind: "follow_up" as const
+      }))
+    ];
+  }
 
-        try {
-          this.transitionRunStatus(runId, nextStatus);
-        } catch {
-          // Ignore failures for disposed or missing runs in development mode.
-        }
-      }, this.lifecycleDelayMs * (index + 1));
+  private async executeWorkflow(
+    runId: string,
+    input: StartPullRequestReviewInput
+  ): Promise<void> {
+    try {
+      this.transitionRunStatus(runId, "running");
 
-      this.scheduledTimers.add(timer);
-    });
+      const workflowResult = await this.workflowExecutor(input);
+      const existingRun = this.runs.get(runId);
+
+      if (!existingRun) {
+        return;
+      }
+
+      const updatedAt = new Date().toISOString();
+      const run: WorkflowRun = {
+        ...existingRun,
+        artifacts: workflowResult.artifacts,
+        confidence: workflowResult.output.confidence,
+        followUpTasks: workflowResult.output.followUpTasks,
+        promptVersion: workflowResult.output.promptVersion,
+        risks: workflowResult.output.risks,
+        status: "waiting_for_approval",
+        suggestedTests: workflowResult.output.suggestedTests,
+        summary: workflowResult.output.summary,
+        updatedAt,
+        workflowVersion: workflowResult.output.workflowVersion
+      };
+
+      run.suggestions = this.createSuggestionsFromWorkflowOutput(run, updatedAt);
+
+      this.runs.set(runId, run);
+      this.publishRunUpdated(run);
+      this.scheduleCompletion(runId);
+    } catch {
+      try {
+        this.transitionRunStatus(runId, "failed");
+      } catch {
+        // Ignore failures for disposed or missing runs in development mode.
+      }
+    }
+  }
+
+  private scheduleCompletion(runId: string): void {
+    const timer = setTimeout(() => {
+      this.scheduledTimers.delete(timer);
+
+      try {
+        this.transitionRunStatus(runId, "completed");
+      } catch {
+        // Ignore failures for disposed or missing runs in development mode.
+      }
+    }, this.lifecycleDelayMs);
+
+    this.scheduledTimers.add(timer);
   }
 }

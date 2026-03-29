@@ -71,6 +71,9 @@ importers:
       '@graphql-tools/schema':
         specifier: ^10.0.25
         version: 10.0.31(graphql@16.13.2)
+      '@patchloom/ai':
+        specifier: workspace:*
+        version: link:../../packages/ai
       '@patchloom/config':
         specifier: workspace:*
         version: link:../../packages/config

@@ -4,8 +4,8 @@ Open-source, self-hostable assistant for engineering workflows. It provides a Gr
 
 ## Current Status
 - Phase 0 foundation is implemented.
-- Phase 1 core API skeleton is in progress.
-- Current API includes run lifecycle transitions and `runUpdated` subscription events.
+- Phase 1 core API skeleton is implemented.
+- Current API includes run lifecycle transitions, `runUpdated` subscription events, and structured PR workflow outputs.
 
 ## Why This Project Exists
 Engineering teams spend too much time on repetitive coordination around code changes:
@@ -40,6 +40,8 @@ This project aims to automate first-pass analysis while keeping human approval f
 - API GraphQL skeleton with `health` query and tests.
 - API GraphQL run flow with `startPullRequestReview`, `getRun`, and `listRuns`.
 - API GraphQL subscription with `runUpdated(runId: ID!)`.
+- PR review workflow nodes producing summary, risks, suggested tests, follow-up tasks, and confidence.
+- Prompt/workflow version metadata and run artifacts (raw model responses + normalized output) stored in run state.
 - In-memory run store for development and test workflows.
 - Provider-agnostic AI interface with Gemini adapter and factory wiring.
 - DB connection check utility with tests.
@@ -110,6 +112,7 @@ The architecture is being built for external agent integration (for example, Ope
 - Query `listRuns`
 - Mutation `startPullRequestReview(input: StartPullRequestReviewInput!)`
 - Subscription `runUpdated(runId: ID!)`
+- `WorkflowRun` now includes `confidence`, `risks`, `suggestedTests`, `followUpTasks`, `promptVersion`, and `workflowVersion`.
 
 ## Subscriptions
 - HTTP endpoint: `http://localhost:4000/graphql`

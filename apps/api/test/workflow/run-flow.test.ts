@@ -19,6 +19,9 @@ describe("workflow run flow", () => {
               pullRequestNumber
               status
               summary
+              confidence
+              promptVersion
+              workflowVersion
               suggestions {
                 kind
               }
@@ -51,6 +54,9 @@ describe("workflow run flow", () => {
       pullRequestNumber: number;
       repository: string;
       status: string;
+      confidence: number;
+      promptVersion: string;
+      workflowVersion: string;
       suggestions: Array<{ kind: string }>;
       summary: string;
     };
@@ -58,8 +64,11 @@ describe("workflow run flow", () => {
     expect(createdRun.repository).toBe("acme/service-api");
     expect(createdRun.pullRequestNumber).toBe(21);
     expect(createdRun.status).toBe("queued");
+    expect(createdRun.confidence).toBe(0);
+    expect(createdRun.promptVersion).toBe("pr-review-prompts/v1");
+    expect(createdRun.workflowVersion).toBe("pr-review-workflow/v1");
     expect(createdRun.summary).toContain("Improve auth refresh flow");
-    expect(createdRun.suggestions.length).toBeGreaterThan(0);
+    expect(createdRun.suggestions).toEqual([]);
 
     const getRunResult = await server.executeOperation(
       {

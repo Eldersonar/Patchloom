@@ -1,14 +1,17 @@
-import { z } from "zod";
-
 import type {
   ModelProvider,
   StructuredGenerationResult,
   TextGenerationResult
 } from "../model-provider";
-
-const LIST_OUTPUT_SCHEMA = z.object({
-  items: z.array(z.string().min(1)).min(1).max(10)
-});
+import {
+  LIST_OUTPUT_SCHEMA,
+  buildFollowUpPrompt,
+  buildRisksPrompt,
+  buildSuggestedTestsPrompt,
+  buildSummaryPrompt,
+  invokeWithRetries,
+  normalizeConfidence
+} from "./pr-review-workflow-helpers";
 
 export interface PullRequestReviewWorkflowInput {
   pullRequestNumber: number;
@@ -63,15 +66,8 @@ export async function generateSummaryNode(
   input: PullRequestReviewWorkflowInput,
   temperature?: number
 ): Promise<{ raw: TextGenerationResult; summary: string }> {
-  const prompt = [
-    "You are reviewing a software pull request.",
-    `Repository: ${input.repository}`,
-    `Pull request: #${input.pullRequestNumber} ${input.pullRequestTitle}`,
-    "Return a concise summary in 2-3 sentences."
-  ].join("\n");
-
   const raw = await provider.generateText({
-    prompt,
+    prompt: buildSummaryPrompt(input),
     temperature
   });
 
@@ -94,15 +90,8 @@ export async function generateRisksNode(
   input: PullRequestReviewWorkflowInput,
   temperature?: number
 ): Promise<{ raw: StructuredGenerationResult<{ items: string[] }>; risks: string[] }> {
-  const prompt = [
-    "You are reviewing pull request risk areas.",
-    `Repository: ${input.repository}`,
-    `Pull request: #${input.pullRequestNumber} ${input.pullRequestTitle}`,
-    "Return JSON with key `items` as a list of 3-5 concrete risk areas."
-  ].join("\n");
-
   const raw = await provider.generateStructured({
-    prompt,
+    prompt: buildRisksPrompt(input),
     schema: LIST_OUTPUT_SCHEMA,
     temperature
   });
@@ -129,15 +118,8 @@ export async function generateSuggestedTestsNode(
   raw: StructuredGenerationResult<{ items: string[] }>;
   suggestedTests: string[];
 }> {
-  const prompt = [
-    "You are generating software test suggestions for a pull request.",
-    `Repository: ${input.repository}`,
-    `Pull request: #${input.pullRequestNumber} ${input.pullRequestTitle}`,
-    "Return JSON with key `items` as 3-6 practical regression tests."
-  ].join("\n");
-
   const raw = await provider.generateStructured({
-    prompt,
+    prompt: buildSuggestedTestsPrompt(input),
     schema: LIST_OUTPUT_SCHEMA,
     temperature
   });
@@ -164,15 +146,8 @@ export async function generateFollowUpTasksNode(
   followUpTasks: string[];
   raw: StructuredGenerationResult<{ items: string[] }>;
 }> {
-  const prompt = [
-    "You are proposing follow-up software engineering tasks.",
-    `Repository: ${input.repository}`,
-    `Pull request: #${input.pullRequestNumber} ${input.pullRequestTitle}`,
-    "Return JSON with key `items` for 2-4 follow-up tasks."
-  ].join("\n");
-
   const raw = await provider.generateStructured({
-    prompt,
+    prompt: buildFollowUpPrompt(input),
     schema: LIST_OUTPUT_SCHEMA,
     temperature
   });
@@ -270,35 +245,4 @@ export async function runPullRequestReviewWorkflow(
       workflowVersion
     }
   };
-}
-
-async function invokeWithRetries<T>(
-  operation: () => Promise<T>,
-  maxRetries: number
-): Promise<T> {
-  let attempt = 0;
-
-  while (true) {
-    try {
-      return await operation();
-    } catch (error) {
-      if (attempt >= maxRetries) {
-        throw error;
-      }
-
-      attempt += 1;
-    }
-  }
-}
-
-function normalizeConfidence(score: number): number {
-  if (score < 0) {
-    return 0;
-  }
-
-  if (score > 1) {
-    return 1;
-  }
-
-  return Math.round(score * 100) / 100;
 }

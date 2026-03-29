@@ -49,14 +49,20 @@ const typeDefs = `#graphql
   }
 
   type WorkflowRun {
+    confidence: Float!
     createdAt: String!
+    followUpTasks: [String!]!
     id: ID!
+    promptVersion: String!
     pullRequestNumber: Int!
     repository: String!
+    risks: [String!]!
     status: String!
+    suggestedTests: [String!]!
     suggestions: [Suggestion!]!
     summary: String!
     updatedAt: String!
+    workflowVersion: String!
     workflowType: String!
   }
 

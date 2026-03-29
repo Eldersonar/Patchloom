@@ -26,14 +26,35 @@ export interface Suggestion {
 }
 
 export interface WorkflowRun {
+  confidence: number;
   createdAt: string;
+  followUpTasks: string[];
   id: string;
+  promptVersion: string;
   pullRequestNumber: number;
   repository: string;
+  risks: string[];
+  artifacts: {
+    normalizedOutput: {
+      confidence: number;
+      followUpTasks: string[];
+      risks: string[];
+      suggestedTests: string[];
+      summary: string;
+    };
+    rawModelResponses: {
+      followUpTasks: string;
+      risks: string;
+      suggestedTests: string;
+      summary: string;
+    };
+  };
   status: RunStatus;
+  suggestedTests: string[];
   suggestions: Suggestion[];
   summary: string;
   updatedAt: string;
+  workflowVersion: string;
   workflowType: "pr_summary";
 }
 
