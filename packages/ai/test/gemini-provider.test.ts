@@ -76,4 +76,34 @@ describe("GeminiProvider", () => {
       })
     ).rejects.toThrowError(/did not contain text output/);
   });
+
+  it("throws when structured output fails schema validation", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          candidates: [
+            {
+              content: {
+                parts: [{ text: '{"severity":"invalid"}' }]
+              }
+            }
+          ]
+        }),
+        { status: 200 }
+      );
+
+    const provider = new GeminiProvider({
+      apiKey: "test-key",
+      fetchImpl
+    });
+
+    await expect(
+      provider.generateStructured({
+        prompt: "Return valid severity",
+        schema: z.object({
+          severity: z.enum(["low", "medium", "high"])
+        })
+      })
+    ).rejects.toThrowError();
+  });
 });
