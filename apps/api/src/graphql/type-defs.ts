@@ -29,6 +29,24 @@ export const typeDefs = `#graphql
     workflowVersion: String!
   }
 
+  type ApprovalDecision {
+    actor: String!
+    createdAt: String!
+    decision: String!
+    id: ID!
+    runId: ID!
+    suggestionId: ID!
+  }
+
+  type CommentPublication {
+    body: String!
+    createdAt: String!
+    id: ID!
+    idempotencyKey: String!
+    runId: ID!
+    target: String!
+  }
+
   input StartPullRequestReviewInput {
     pullRequestNumber: Int!
     pullRequestTitle: String!
@@ -39,13 +57,31 @@ export const typeDefs = `#graphql
     pullRequestUrl: String!
   }
 
+  input ApproveSuggestionInput {
+    actor: String!
+    decision: String!
+    runId: ID!
+    suggestionId: ID!
+  }
+
+  input PublishCommentInput {
+    body: String!
+    idempotencyKey: String!
+    runId: ID!
+    target: String!
+  }
+
   type Query {
     getRun(id: ID!): WorkflowRun
     health: Health!
+    listApprovalDecisions(runId: ID!): [ApprovalDecision!]!
+    listCommentPublications(runId: ID!): [CommentPublication!]!
     listRuns: [WorkflowRun!]!
   }
 
   type Mutation {
+    approveSuggestion(input: ApproveSuggestionInput!): ApprovalDecision!
+    publishComment(input: PublishCommentInput!): CommentPublication!
     startPullRequestReview(input: StartPullRequestReviewInput!): WorkflowRun!
     startPullRequestReviewFromUrl(input: StartPullRequestReviewFromUrlInput!): WorkflowRun!
   }

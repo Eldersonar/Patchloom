@@ -24,7 +24,23 @@ Fields:
 - `created_at` timestamptz
 
 ## ApprovalDecision
-Planned for next phase.
+Represents a human approval or rejection decision for a suggestion.
+
+Fields:
+- `id` UUID primary key
+- `run_id` UUID reference to workflow run
+- `suggestion_id` UUID reference to suggestion
+- `actor` text (who approved/rejected)
+- `decision` text (`approved` or `rejected`)
+- `created_at` timestamptz
 
 ## CommentPublication
-Planned for next phase.
+Represents a publish action for approved suggestions.
+
+Fields:
+- `id` UUID primary key
+- `run_id` UUID reference to workflow run
+- `idempotency_key` text unique per run publication attempt
+- `target` text (publication target URL/resource)
+- `body` text (published comment body)
+- `created_at` timestamptz

@@ -43,6 +43,7 @@ This project aims to automate first-pass analysis while keeping human approval f
 - API GraphQL subscription with `runUpdated(runId: ID!)`.
 - PR review workflow nodes producing summary, risks, suggested tests, follow-up tasks, and confidence.
 - Prompt/workflow version metadata and run artifacts (raw model responses + normalized output) stored in run state.
+- Suggestion approval and publish-governance store with idempotent publication records.
 - In-memory run store for development and test workflows.
 - Provider-agnostic AI interface with Gemini adapter and factory wiring.
 - DB connection check utility with tests.
@@ -116,6 +117,10 @@ The architecture is being built for external agent integration (for example, Ope
 - Query `listRuns`
 - Mutation `startPullRequestReview(input: StartPullRequestReviewInput!)`
 - Mutation `startPullRequestReviewFromUrl(input: StartPullRequestReviewFromUrlInput!)`
+- Mutation `approveSuggestion(input: ApproveSuggestionInput!)`
+- Mutation `publishComment(input: PublishCommentInput!)`
+- Query `listApprovalDecisions(runId: ID!)`
+- Query `listCommentPublications(runId: ID!)`
 - Subscription `runUpdated(runId: ID!)`
 - `WorkflowRun` now includes `confidence`, `risks`, `suggestedTests`, `followUpTasks`, `promptVersion`, and `workflowVersion`.
 
