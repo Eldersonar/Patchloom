@@ -43,9 +43,11 @@ This project aims to automate first-pass analysis while keeping human approval f
 - API GraphQL subscription with `runUpdated(runId: ID!)`.
 - PR review workflow nodes producing summary, risks, suggested tests, follow-up tasks, and confidence.
 - Prompt/workflow version metadata and run artifacts (raw model responses + normalized output) stored in run state.
+- Retry and timeout policy for model calls, including exponential backoff for transient failures.
 - Suggestion approval and publish-governance store with idempotent publication records.
 - In-memory run store for development and test workflows.
 - GitHub token-mode comment publishing for approved suggestions.
+- Structured run-state logs with `runId`, `workflowType`, `provider`, and `state`.
 - Web dashboard for starting runs, viewing run list/details, subscribing to live run updates, approving suggestions, and publishing approved comments.
 - Provider-agnostic AI interface with Gemini adapter and factory wiring.
 - DB connection check utility with tests.
@@ -106,6 +108,7 @@ Required for current scaffold:
   - `pnpm lint`
   - `pnpm typecheck`
   - `pnpm test`
+  - `pnpm test:coverage` (enforces coverage thresholds for `apps/api` and `packages/ai`)
 
 ## Agent Compatibility
 The architecture is being built for external agent integration (for example, OpenClaw):
@@ -133,6 +136,7 @@ The architecture is being built for external agent integration (for example, Ope
 - Query `listCommentPublications(runId: ID!)`
 - Subscription `runUpdated(runId: ID!)`
 - `WorkflowRun` now includes `confidence`, `risks`, `suggestedTests`, `followUpTasks`, `promptVersion`, and `workflowVersion`.
+- Failed runs expose `failureReason` for clearer terminal-state diagnostics.
 
 ## Subscriptions
 - HTTP endpoint: `http://localhost:4000/graphql`

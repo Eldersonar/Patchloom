@@ -8,6 +8,7 @@
     "dev": "pnpm -r --parallel --if-present dev",
     "lint": "pnpm -r --if-present lint",
     "test": "pnpm -r --if-present test",
+    "test:coverage": "pnpm --filter @patchloom/ai test:coverage && pnpm --filter @patchloom/api test:coverage",
     "typecheck": "pnpm -r --if-present typecheck"
   },
   "devDependencies": {
@@ -21,6 +22,7 @@
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.42.0",
     "@typescript-eslint/parser": "^8.42.0",
+    "@vitest/coverage-v8": "^3.2.4",
     "eslint": "^9.35.0",
     "globals": "^16.3.0",
     "tsx": "^4.20.5",

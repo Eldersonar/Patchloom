@@ -36,3 +36,6 @@ jobs:
 
       - name: Test
         run: pnpm test
+
+      - name: Coverage gates
+        run: pnpm test:coverage
