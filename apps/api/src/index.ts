@@ -12,6 +12,7 @@ export async function bootstrap(): Promise<void> {
   const started = await startApiServer(env.PORT, env.APP_VERSION);
 
   console.log(`API running at ${started.url}`);
+  console.log(`Subscriptions running at ${started.subscriptionUrl}`);
 }
 
 bootstrap().catch((error) => {

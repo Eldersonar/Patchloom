@@ -1,4 +1,6 @@
 export {
+  allowedRunTransitions,
+  canTransitionRunStatus,
   runStatuses,
   type RunStatus,
   type StartPullRequestReviewInput,

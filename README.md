@@ -5,7 +5,7 @@ Open-source, self-hostable assistant for engineering workflows. It provides a Gr
 ## Current Status
 - Phase 0 foundation is implemented.
 - Phase 1 core API skeleton is in progress.
-- Current API includes run operations: `startPullRequestReview`, `getRun`, and `listRuns`.
+- Current API includes run lifecycle transitions and `runUpdated` subscription events.
 
 ## Why This Project Exists
 Engineering teams spend too much time on repetitive coordination around code changes:
@@ -38,6 +38,7 @@ This project aims to automate first-pass analysis while keeping human approval f
 - Typed env validation (`zod`) with tests.
 - API GraphQL skeleton with `health` query and tests.
 - API GraphQL run flow with `startPullRequestReview`, `getRun`, and `listRuns`.
+- API GraphQL subscription with `runUpdated(runId: ID!)`.
 - In-memory run store for development and test workflows.
 - DB connection check utility with tests.
 - Initial SQL migration and domain model documentation.
@@ -104,6 +105,12 @@ The architecture is being built for external agent integration (for example, Ope
 - Query `getRun(id: ID!)`
 - Query `listRuns`
 - Mutation `startPullRequestReview(input: StartPullRequestReviewInput!)`
+- Subscription `runUpdated(runId: ID!)`
+
+## Subscriptions
+- HTTP endpoint: `http://localhost:4000/graphql`
+- WebSocket endpoint: `ws://localhost:4000/graphql`
+- Reconnect strategy and usage notes: [`docs/subscriptions.md`](/home/simon/Documents/personal/Patchloom/docs/subscriptions.md)
 
 ## Roadmap (Near-Term)
 1. Run model + persistence schema (`WorkflowRun`, `Suggestion`, approvals)

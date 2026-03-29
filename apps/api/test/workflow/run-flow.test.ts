@@ -5,7 +5,7 @@ import { InMemoryRunStore } from "../../src/workflow/run-store";
 
 describe("workflow run flow", () => {
   it("creates and fetches pull request review runs", async () => {
-    const runStore = new InMemoryRunStore();
+    const runStore = new InMemoryRunStore({ autoProgress: false });
     const server = createGraphQLServer("0.1.0-test", runStore);
     await server.start();
 
@@ -57,7 +57,7 @@ describe("workflow run flow", () => {
 
     expect(createdRun.repository).toBe("acme/service-api");
     expect(createdRun.pullRequestNumber).toBe(21);
-    expect(createdRun.status).toBe("completed");
+    expect(createdRun.status).toBe("queued");
     expect(createdRun.summary).toContain("Improve auth refresh flow");
     expect(createdRun.suggestions.length).toBeGreaterThan(0);
 
@@ -68,6 +68,7 @@ describe("workflow run flow", () => {
             getRun(id: $id) {
               id
               summary
+              status
             }
           }
         `,
@@ -88,10 +89,11 @@ describe("workflow run flow", () => {
     }
 
     const fetchedRun = getRunResult.body.singleResult.data?.getRun as
-      | { id: string }
+      | { id: string; status: string }
       | undefined;
 
     expect(fetchedRun?.id).toBe(createdRun.id);
+    expect(fetchedRun?.status).toBe("queued");
 
     const listRunsResult = await server.executeOperation(
       {
@@ -106,6 +108,7 @@ describe("workflow run flow", () => {
     );
 
     await server.stop();
+    runStore.dispose();
 
     if (listRunsResult.body.kind !== "single") {
       throw new Error("Expected single response body");

@@ -9,6 +9,15 @@ export const runStatuses = [
 
 export type RunStatus = (typeof runStatuses)[number];
 
+export const allowedRunTransitions: Record<RunStatus, RunStatus[]> = {
+  cancelled: [],
+  completed: [],
+  failed: [],
+  queued: ["running", "cancelled", "failed"],
+  running: ["waiting_for_approval", "completed", "failed", "cancelled"],
+  waiting_for_approval: ["completed", "failed", "cancelled", "running"]
+};
+
 export interface Suggestion {
   content: string;
   createdAt: string;
@@ -32,4 +41,18 @@ export interface StartPullRequestReviewInput {
   pullRequestNumber: number;
   pullRequestTitle: string;
   repository: string;
+}
+
+/**
+ * Checks whether a run status transition is valid.
+ *
+ * @param currentStatus - Current run status.
+ * @param nextStatus - Target run status.
+ * @returns True when transition is allowed.
+ */
+export function canTransitionRunStatus(
+  currentStatus: RunStatus,
+  nextStatus: RunStatus
+): boolean {
+  return allowedRunTransitions[currentStatus].includes(nextStatus);
 }
