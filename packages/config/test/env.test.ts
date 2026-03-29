@@ -14,6 +14,23 @@ describe("loadEnvironment", () => {
     expect(result.PORT).toBe(4000);
     expect(result.GEMINI_MODEL).toBe("gemini-2.5-flash");
     expect(result.GITHUB_API_URL).toBe("https://api.github.com");
+    expect(result.DEMO_MODE).toBe(false);
+  });
+
+  it("parses DEMO_MODE from string env values", () => {
+    const enabled = loadEnvironment({
+      DATABASE_URL: "https://example.com/db",
+      DEMO_MODE: "true",
+      REDIS_URL: "https://example.com/redis"
+    });
+    const disabled = loadEnvironment({
+      DATABASE_URL: "https://example.com/db",
+      DEMO_MODE: "0",
+      REDIS_URL: "https://example.com/redis"
+    });
+
+    expect(enabled.DEMO_MODE).toBe(true);
+    expect(disabled.DEMO_MODE).toBe(false);
   });
 
   it("throws for invalid required values", () => {

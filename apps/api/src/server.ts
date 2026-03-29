@@ -20,11 +20,16 @@ import {
   type GitHubPullRequestReader
 } from "./integrations/github-reader";
 import { registerGitHubWebhookRoute } from "./integrations/github-webhook-route";
+import { seedDemoRuns } from "./workflow/demo-mode";
 import { InMemoryRunStore } from "./workflow/run-store";
 import { InMemoryReviewGovernanceStore } from "./workflow/review-governance-store";
 
 interface Disposable {
   dispose: () => void | Promise<void>;
+}
+
+export interface StartApiServerOptions extends CreateGitHubPullRequestReaderOptions {
+  demoMode?: boolean;
 }
 
 /**
@@ -114,14 +119,19 @@ export function createGraphQLServer(
 export async function startApiServer(
   port: number,
   appVersion: string,
-  githubOptions: CreateGitHubPullRequestReaderOptions = {}
+  options: StartApiServerOptions = {}
 ): Promise<{ subscriptionUrl: string; url: string }> {
   const runStore = new InMemoryRunStore();
-  const githubCommentPublisher = createGitHubCommentPublisher(githubOptions);
+  const githubCommentPublisher = createGitHubCommentPublisher(options);
   const reviewGovernanceStore = new InMemoryReviewGovernanceStore({
     commentPublisher: githubCommentPublisher
   });
-  const githubPullRequestReader = createGitHubPullRequestReader(githubOptions);
+  const githubPullRequestReader = createGitHubPullRequestReader(options);
+
+  if (options.demoMode) {
+    seedDemoRuns(runStore);
+  }
+
   const app = express();
   const httpServer = createServer(app);
   const subscriptionSchema = createGraphQLSchema(
@@ -161,7 +171,7 @@ export async function startApiServer(
 
   registerGitHubWebhookRoute(app, {
     runStore,
-    webhookSecret: githubOptions.githubWebhookSecret
+    webhookSecret: options.githubWebhookSecret
   });
 
   app.use(
