@@ -1,6 +1,11 @@
 import { createClient, type Client } from "graphql-ws";
 
-import type { StartRunInput, WorkflowRunView } from "./workflow-types";
+import type {
+  ApprovalDecisionView,
+  CommentPublicationView,
+  StartRunInput,
+  WorkflowRunView
+} from "./workflow-types";
 
 const defaultHttpUrl = "http://localhost:4000/graphql";
 const defaultWsUrl = "ws://localhost:4000/graphql";
@@ -24,6 +29,11 @@ export async function fetchRuns(): Promise<WorkflowRunView[]> {
         createdAt
         summary
         confidence
+        suggestions {
+          id
+          kind
+          content
+        }
         risks
         suggestedTests
         followUpTasks
@@ -54,6 +64,11 @@ export async function startPullRequestReview(
         createdAt
         summary
         confidence
+        suggestions {
+          id
+          kind
+          content
+        }
         risks
         suggestedTests
         followUpTasks
@@ -91,6 +106,11 @@ export function subscribeRunUpdated(
           createdAt
           summary
           confidence
+          suggestions {
+            id
+            kind
+            content
+          }
           risks
           suggestedTests
           followUpTasks
@@ -121,6 +141,124 @@ export function subscribeRunUpdated(
   );
 
   return () => unsubscribe();
+}
+
+/**
+ * Lists approval decisions for a workflow run.
+ *
+ * @param runId - Workflow run identifier.
+ * @returns Approval decisions for the run.
+ */
+export async function listApprovalDecisions(
+  runId: string
+): Promise<ApprovalDecisionView[]> {
+  const result = await executeGraphQL<{
+    listApprovalDecisions: ApprovalDecisionView[];
+  }>(
+    `query Decisions($runId: ID!) {
+      listApprovalDecisions(runId: $runId) {
+        id
+        runId
+        suggestionId
+        actor
+        decision
+        createdAt
+      }
+    }`,
+    { runId }
+  );
+
+  return result.listApprovalDecisions;
+}
+
+/**
+ * Approves or rejects a suggestion.
+ *
+ * @param input - Suggestion decision payload.
+ * @returns Stored approval decision.
+ */
+export async function approveSuggestion(input: {
+  actor: string;
+  decision: "approved" | "rejected";
+  runId: string;
+  suggestionId: string;
+}): Promise<ApprovalDecisionView> {
+  const result = await executeGraphQL<{ approveSuggestion: ApprovalDecisionView }>(
+    `mutation Approve($input: ApproveSuggestionInput!) {
+      approveSuggestion(input: $input) {
+        id
+        runId
+        suggestionId
+        actor
+        decision
+        createdAt
+      }
+    }`,
+    { input }
+  );
+
+  return result.approveSuggestion;
+}
+
+/**
+ * Lists published comments for a workflow run.
+ *
+ * @param runId - Workflow run identifier.
+ * @returns Stored comment publications.
+ */
+export async function listCommentPublications(
+  runId: string
+): Promise<CommentPublicationView[]> {
+  const result = await executeGraphQL<{
+    listCommentPublications: CommentPublicationView[];
+  }>(
+    `query Publications($runId: ID!) {
+      listCommentPublications(runId: $runId) {
+        id
+        runId
+        target
+        body
+        idempotencyKey
+        commentId
+        publishedUrl
+        createdAt
+      }
+    }`,
+    { runId }
+  );
+
+  return result.listCommentPublications;
+}
+
+/**
+ * Publishes an approved comment to GitHub.
+ *
+ * @param input - Publication payload.
+ * @returns Stored publication result.
+ */
+export async function publishComment(input: {
+  body: string;
+  idempotencyKey: string;
+  runId: string;
+  target: string;
+}): Promise<CommentPublicationView> {
+  const result = await executeGraphQL<{ publishComment: CommentPublicationView }>(
+    `mutation Publish($input: PublishCommentInput!) {
+      publishComment(input: $input) {
+        id
+        runId
+        target
+        body
+        idempotencyKey
+        commentId
+        publishedUrl
+        createdAt
+      }
+    }`,
+    { input }
+  );
+
+  return result.publishComment;
 }
 
 /**

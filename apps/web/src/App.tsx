@@ -1,11 +1,26 @@
 import { useEffect, useMemo, useState, type ReactElement } from "react";
 
 import {
+  approveSuggestion,
   fetchRuns,
+  listApprovalDecisions,
+  listCommentPublications,
+  publishComment,
   startPullRequestReview,
   subscribeRunUpdated
 } from "./graphql-client";
-import type { WorkflowRunView } from "./workflow-types";
+import {
+  buildPublishBody,
+  buildPullRequestUrl,
+  errorMessage,
+  mergeRun
+} from "./run-utils";
+import { RunDetailPanel } from "./run-detail-panel";
+import type {
+  ApprovalDecisionView,
+  CommentPublicationView,
+  WorkflowRunView
+} from "./workflow-types";
 import "./app.css";
 
 /**
@@ -14,9 +29,16 @@ import "./app.css";
  * @returns Web application shell.
  */
 export function App(): ReactElement {
+  const [approvalsBySuggestionId, setApprovalsBySuggestionId] = useState<
+    Record<string, ApprovalDecisionView>
+  >({});
   const [error, setError] = useState<string | null>(null);
+  const [isApproving, setIsApproving] = useState(false);
   const [isLoadingRuns, setIsLoadingRuns] = useState(false);
+  const [isLoadingRunMeta, setIsLoadingRunMeta] = useState(false);
+  const [isPublishing, setIsPublishing] = useState(false);
   const [isStartingRun, setIsStartingRun] = useState(false);
+  const [publications, setPublications] = useState<CommentPublicationView[]>([]);
   const [runs, setRuns] = useState<WorkflowRunView[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [formRepository, setFormRepository] = useState("acme/payments");
@@ -31,8 +53,12 @@ export function App(): ReactElement {
 
   useEffect(() => {
     if (!selectedRunId) {
+      setApprovalsBySuggestionId({});
+      setPublications([]);
       return undefined;
     }
+
+    void loadRunGovernance(selectedRunId);
 
     const unsubscribe = subscribeRunUpdated(
       selectedRunId,
@@ -70,6 +96,33 @@ export function App(): ReactElement {
     }
   }
 
+  async function loadRunGovernance(runId: string): Promise<void> {
+    setIsLoadingRunMeta(true);
+    setError(null);
+
+    try {
+      const [decisions, fetchedPublications] = await Promise.all([
+        listApprovalDecisions(runId),
+        listCommentPublications(runId)
+      ]);
+
+      const mappedDecisions = decisions.reduce<Record<string, ApprovalDecisionView>>(
+        (accumulator, decision) => {
+          accumulator[decision.suggestionId] = decision;
+          return accumulator;
+        },
+        {}
+      );
+
+      setApprovalsBySuggestionId(mappedDecisions);
+      setPublications(fetchedPublications);
+    } catch (loadError) {
+      setError(errorMessage(loadError, "Failed to load run approval data"));
+    } finally {
+      setIsLoadingRunMeta(false);
+    }
+  }
+
   async function handleStartRun(): Promise<void> {
     setIsStartingRun(true);
     setError(null);
@@ -87,6 +140,66 @@ export function App(): ReactElement {
       setError(errorMessage(startError, "Failed to start run"));
     } finally {
       setIsStartingRun(false);
+    }
+  }
+
+  async function handleApproveSuggestion(
+    suggestionId: string,
+    decision: "approved" | "rejected"
+  ): Promise<void> {
+    if (!selectedRunId) {
+      return;
+    }
+
+    setIsApproving(true);
+    setError(null);
+
+    try {
+      const savedDecision = await approveSuggestion({
+        actor: "dashboard-user",
+        decision,
+        runId: selectedRunId,
+        suggestionId
+      });
+
+      setApprovalsBySuggestionId((current) => ({
+        ...current,
+        [savedDecision.suggestionId]: savedDecision
+      }));
+    } catch (approvalError) {
+      setError(errorMessage(approvalError, "Failed to save suggestion decision"));
+    } finally {
+      setIsApproving(false);
+    }
+  }
+
+  async function handlePublishComment(): Promise<void> {
+    if (!selectedRun) {
+      return;
+    }
+
+    setIsPublishing(true);
+    setError(null);
+
+    try {
+      const publication = await publishComment({
+        body: buildPublishBody(selectedRun),
+        idempotencyKey: `run-${selectedRun.id}-summary-v1`,
+        runId: selectedRun.id,
+        target: buildPullRequestUrl(selectedRun)
+      });
+
+      setPublications((current) => {
+        if (current.some((existing) => existing.id === publication.id)) {
+          return current;
+        }
+
+        return [publication, ...current];
+      });
+    } catch (publishError) {
+      setError(errorMessage(publishError, "Failed to publish comment"));
+    } finally {
+      setIsPublishing(false);
     }
   }
 
@@ -157,82 +270,23 @@ export function App(): ReactElement {
           </ul>
         </aside>
 
-        <article className="panel panel--detail">
-          <h2>Run Details</h2>
-          {!selectedRun ? <p>Select a run to view details.</p> : null}
-          {selectedRun ? (
-            <>
-              <p>
-                <strong>Status:</strong> {selectedRun.status}
-              </p>
-              <p>
-                <strong>Confidence:</strong> {selectedRun.confidence}
-              </p>
-              <p>
-                <strong>Summary:</strong> {selectedRun.summary}
-              </p>
-              <DetailList title="Risks" values={selectedRun.risks} />
-              <DetailList title="Suggested Tests" values={selectedRun.suggestedTests} />
-              <DetailList title="Follow-up Tasks" values={selectedRun.followUpTasks} />
-            </>
-          ) : null}
-        </article>
+        <>
+          {isLoadingRunMeta ? <p>Loading approvals and publications...</p> : null}
+          <RunDetailPanel
+            approvalsBySuggestionId={approvalsBySuggestionId}
+            isApproving={isApproving}
+            isPublishing={isPublishing}
+            onApprove={(suggestionId, decision) => {
+              void handleApproveSuggestion(suggestionId, decision);
+            }}
+            onPublish={() => {
+              void handlePublishComment();
+            }}
+            publications={publications}
+            run={selectedRun}
+          />
+        </>
       </section>
     </main>
   );
-}
-
-/**
- * Renders a detail list section with fallback text when empty.
- *
- * @param props - Section title and values.
- * @returns Detail list UI block.
- */
-function DetailList(props: { title: string; values: string[] }): ReactElement {
-  if (props.values.length === 0) {
-    return (
-      <section>
-        <h3>{props.title}</h3>
-        <p>None</p>
-      </section>
-    );
-  }
-
-  return (
-    <section>
-      <h3>{props.title}</h3>
-      <ul>
-        {props.values.map((value) => (
-          <li key={value}>{value}</li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-/**
- * Merges an updated run into the current run list while keeping newest first.
- *
- * @param newRun - Updated run payload.
- * @param runs - Existing run list.
- * @returns Updated run list.
- */
-function mergeRun(newRun: WorkflowRunView, runs: WorkflowRunView[]): WorkflowRunView[] {
-  const filteredRuns = runs.filter((run) => run.id !== newRun.id);
-  return [newRun, ...filteredRuns];
-}
-
-/**
- * Converts unknown errors into user-facing messages.
- *
- * @param error - Unknown thrown value.
- * @param fallback - Fallback message when error is not an Error instance.
- * @returns Human-readable error text.
- */
-function errorMessage(error: unknown, fallback: string): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return fallback;
 }

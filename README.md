@@ -5,7 +5,7 @@ Open-source, self-hostable assistant for engineering workflows. It provides a Gr
 ## Current Status
 - Phase 0 foundation is implemented.
 - Phase 1 core API skeleton is implemented.
-- Current API includes run lifecycle transitions, `runUpdated` subscription events, and structured PR workflow outputs.
+- Current API includes run lifecycle transitions, `runUpdated` subscription events, structured PR workflow outputs, and approval-gated GitHub publishing.
 
 ## Why This Project Exists
 Engineering teams spend too much time on repetitive coordination around code changes:
@@ -45,7 +45,8 @@ This project aims to automate first-pass analysis while keeping human approval f
 - Prompt/workflow version metadata and run artifacts (raw model responses + normalized output) stored in run state.
 - Suggestion approval and publish-governance store with idempotent publication records.
 - In-memory run store for development and test workflows.
-- Web dashboard for starting runs, viewing run list/details, and subscribing to live run updates.
+- GitHub token-mode comment publishing for approved suggestions.
+- Web dashboard for starting runs, viewing run list/details, subscribing to live run updates, approving suggestions, and publishing approved comments.
 - Provider-agnostic AI interface with Gemini adapter and factory wiring.
 - DB connection check utility with tests.
 - Initial SQL migration and domain model documentation.
@@ -117,6 +118,8 @@ The architecture is being built for external agent integration (for example, Ope
 - View run list with status and repository context.
 - View structured run details (summary, risks, suggested tests, follow-up tasks).
 - Receive live status/detail updates through GraphQL `runUpdated` subscriptions.
+- Approve/reject generated suggestions from run details.
+- Publish approved summary comments to GitHub pull requests.
 
 ## GraphQL Operations (Current)
 - Query `health`
@@ -138,6 +141,9 @@ The architecture is being built for external agent integration (for example, Ope
 
 ## GitHub Token Mode
 - Manual PR URL trigger docs: [`docs/github-integration.md`](/home/simon/Documents/personal/Patchloom/docs/github-integration.md)
+- Required for publish actions:
+  - `GITHUB_TOKEN` must include pull request comment permissions.
+  - `publishComment` enforces full suggestion approval before posting.
 
 ## Roadmap (Near-Term)
 1. Run model + persistence schema (`WorkflowRun`, `Suggestion`, approvals)
