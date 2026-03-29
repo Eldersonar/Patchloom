@@ -7,6 +7,8 @@
     "build": "pnpm -r --if-present build",
     "dev": "pnpm -r --parallel --if-present dev",
     "lint": "pnpm -r --if-present lint",
+    "test:integration": "pnpm --filter @patchloom/api test",
+    "test:unit": "pnpm --filter @patchloom/ai test && pnpm --filter @patchloom/config test && pnpm --filter @patchloom/core test && pnpm --filter @patchloom/db test && pnpm --filter @patchloom/integrations-github test && pnpm --filter @patchloom/web test",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck"
   },
