@@ -1,12 +1,19 @@
 import { describe, expect, it } from "vitest";
 
 import { InMemoryRunStore } from "../../src/workflow/run-store";
+import type { WorkflowLogEvent } from "../../src/workflow/workflow-logger";
 
 describe("run workflow execution", () => {
   it("applies workflow output and completes lifecycle", async () => {
+    const logEvents: WorkflowLogEvent[] = [];
     const runStore = new InMemoryRunStore({
       autoProgress: true,
       lifecycleDelayMs: 5,
+      logger: {
+        logRunEvent(event) {
+          logEvents.push(event);
+        }
+      },
       workflowExecutor: async () => ({
         artifacts: {
           normalizedOutput: {
@@ -51,20 +58,36 @@ describe("run workflow execution", () => {
       "Add regression test for expired refresh token."
     ]);
     expect(completedRun.followUpTasks).toEqual(["Document rollback checklist."]);
+    expect(completedRun.failureReason).toBeNull();
     expect(completedRun.suggestions.map((item) => item.kind)).toEqual([
       "risk",
       "test",
       "follow_up"
     ]);
     expect(completedRun.artifacts.rawModelResponses.risks).toContain("items");
+    expect(
+      logEvents.some(
+        (event) =>
+          event.runId === run.id &&
+          event.state === "completed" &&
+          event.workflowType === "pr_summary" &&
+          event.provider === "unknown"
+      )
+    ).toBe(true);
 
     runStore.dispose();
   });
 
   it("marks runs as failed when workflow execution throws", async () => {
+    const logEvents: WorkflowLogEvent[] = [];
     const runStore = new InMemoryRunStore({
       autoProgress: true,
       lifecycleDelayMs: 5,
+      logger: {
+        logRunEvent(event) {
+          logEvents.push(event);
+        }
+      },
       workflowExecutor: async () => {
         throw new Error("workflow failure");
       }
@@ -79,7 +102,16 @@ describe("run workflow execution", () => {
     const failedRun = await waitForRunStatus(runStore, run.id, "failed");
 
     expect(failedRun.status).toBe("failed");
+    expect(failedRun.failureReason).toContain("workflow failure");
     expect(failedRun.summary).toContain("Adjust billing retries");
+    expect(
+      logEvents.some(
+        (event) =>
+          event.state === "failed" &&
+          event.error?.includes("workflow failure") &&
+          event.provider === "pending"
+      )
+    ).toBe(true);
 
     runStore.dispose();
   });

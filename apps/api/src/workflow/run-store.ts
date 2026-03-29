@@ -4,7 +4,6 @@ import {
   canTransitionRunStatus,
   type RunStatus,
   type StartPullRequestReviewInput,
-  type Suggestion,
   type WorkflowRun
 } from "@patchloom/core";
 import { PubSub } from "graphql-subscriptions";
@@ -13,12 +12,21 @@ import {
   createDefaultWorkflowExecutor,
   type PullRequestReviewWorkflowExecutor
 } from "./default-workflow-executor";
-
+import {
+  NullWorkflowLogger,
+  type WorkflowLogger
+} from "./workflow-logger";
+import {
+  createInitialArtifacts,
+  createSuggestionsFromWorkflowOutput,
+  toErrorMessage
+} from "./run-store-helpers";
 const RUN_UPDATED_EVENT = "runUpdated";
 
 export interface RunStoreOptions {
   autoProgress?: boolean;
   lifecycleDelayMs?: number;
+  logger?: WorkflowLogger;
   workflowExecutor?: PullRequestReviewWorkflowExecutor;
 }
 
@@ -36,15 +44,12 @@ interface RunEventMap {
  */
 export class InMemoryRunStore {
   private readonly autoProgress: boolean;
-
   private readonly lifecycleDelayMs: number;
-
+  private readonly logger: WorkflowLogger;
+  private readonly providerByRun = new Map<string, string>();
   private readonly workflowExecutor: PullRequestReviewWorkflowExecutor;
-
   private readonly pubSub = new PubSub<RunEventMap>();
-
   private readonly runs = new Map<string, WorkflowRun>();
-
   private readonly scheduledTimers = new Set<NodeJS.Timeout>();
 
   /**
@@ -55,6 +60,7 @@ export class InMemoryRunStore {
   public constructor(options: RunStoreOptions = {}) {
     this.autoProgress = options.autoProgress ?? true;
     this.lifecycleDelayMs = options.lifecycleDelayMs ?? 100;
+    this.logger = options.logger ?? new NullWorkflowLogger();
     this.workflowExecutor =
       options.workflowExecutor ?? createDefaultWorkflowExecutor();
   }
@@ -69,10 +75,11 @@ export class InMemoryRunStore {
     const now = new Date().toISOString();
 
     const run: WorkflowRun = {
-      artifacts: this.createInitialArtifacts(),
+      artifacts: createInitialArtifacts(),
       confidence: 0,
       createdAt: now,
       followUpTasks: [],
+      failureReason: null,
       id: randomUUID(),
       promptVersion: "pr-review-prompts/v1",
       pullRequestNumber: input.pullRequestNumber,
@@ -88,7 +95,9 @@ export class InMemoryRunStore {
     };
 
     this.runs.set(run.id, run);
+    this.providerByRun.set(run.id, "pending");
     this.publishRunUpdated(run);
+    this.logRunState(run, run.status);
 
     if (this.autoProgress) {
       void this.executeWorkflow(run.id, input);
@@ -125,6 +134,7 @@ export class InMemoryRunStore {
 
     this.runs.set(runId, updatedRun);
     this.publishRunUpdated(updatedRun);
+    this.logRunState(updatedRun, nextStatus);
 
     return updatedRun;
   }
@@ -168,6 +178,7 @@ export class InMemoryRunStore {
     }
 
     this.scheduledTimers.clear();
+    this.providerByRun.clear();
   }
 
   /**
@@ -179,50 +190,6 @@ export class InMemoryRunStore {
     this.pubSub.publish(RUN_UPDATED_EVENT, {
       runUpdated: run
     });
-  }
-
-  private createInitialArtifacts(): WorkflowRun["artifacts"] {
-    return {
-      normalizedOutput: {
-        confidence: 0,
-        followUpTasks: [],
-        risks: [],
-        suggestedTests: [],
-        summary: ""
-      },
-      rawModelResponses: {
-        followUpTasks: "",
-        risks: "",
-        suggestedTests: "",
-        summary: ""
-      }
-    };
-  }
-
-  private createSuggestionsFromWorkflowOutput(
-    run: WorkflowRun,
-    createdAt: string
-  ): Suggestion[] {
-    return [
-      ...run.risks.map((risk) => ({
-        content: risk,
-        createdAt,
-        id: randomUUID(),
-        kind: "risk" as const
-      })),
-      ...run.suggestedTests.map((test) => ({
-        content: test,
-        createdAt,
-        id: randomUUID(),
-        kind: "test" as const
-      })),
-      ...run.followUpTasks.map((task) => ({
-        content: task,
-        createdAt,
-        id: randomUUID(),
-        kind: "follow_up" as const
-      }))
-    ];
   }
 
   private async executeWorkflow(
@@ -244,6 +211,7 @@ export class InMemoryRunStore {
         ...existingRun,
         artifacts: workflowResult.artifacts,
         confidence: workflowResult.output.confidence,
+        failureReason: null,
         followUpTasks: workflowResult.output.followUpTasks,
         promptVersion: workflowResult.output.promptVersion,
         risks: workflowResult.output.risks,
@@ -253,15 +221,18 @@ export class InMemoryRunStore {
         updatedAt,
         workflowVersion: workflowResult.output.workflowVersion
       };
+      const provider = workflowResult.output.provider ?? "unknown";
 
-      run.suggestions = this.createSuggestionsFromWorkflowOutput(run, updatedAt);
+      run.suggestions = createSuggestionsFromWorkflowOutput(run, updatedAt);
+      this.providerByRun.set(runId, provider);
 
       this.runs.set(runId, run);
       this.publishRunUpdated(run);
+      this.logRunState(run, run.status, provider);
       this.scheduleCompletion(runId);
-    } catch {
+    } catch (error) {
       try {
-        this.transitionRunStatus(runId, "failed");
+        this.markRunFailed(runId, toErrorMessage(error));
       } catch {
         // Ignore failures for disposed or missing runs in development mode.
       }
@@ -280,5 +251,49 @@ export class InMemoryRunStore {
     }, this.lifecycleDelayMs);
 
     this.scheduledTimers.add(timer);
+  }
+  private markRunFailed(runId: string, reason: string): void {
+    const existingRun = this.runs.get(runId);
+
+    if (!existingRun) {
+      return;
+    }
+
+    if (!canTransitionRunStatus(existingRun.status, "failed")) {
+      throw new Error(
+        `Invalid transition from ${existingRun.status} to failed`
+      );
+    }
+
+    const failedRun: WorkflowRun = {
+      ...existingRun,
+      failureReason: reason,
+      status: "failed",
+      updatedAt: new Date().toISOString()
+    };
+
+    this.runs.set(runId, failedRun);
+    this.publishRunUpdated(failedRun);
+    this.logRunState(
+      failedRun,
+      failedRun.status,
+      this.providerByRun.get(runId) ?? "unknown",
+      reason
+    );
+  }
+
+  private logRunState(
+    run: WorkflowRun,
+    state: RunStatus,
+    provider: string = this.providerByRun.get(run.id) ?? "unknown",
+    error?: string
+  ): void {
+    this.logger.logRunEvent({
+      error,
+      provider,
+      runId: run.id,
+      state,
+      workflowType: run.workflowType
+    });
   }
 }

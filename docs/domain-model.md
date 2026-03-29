@@ -10,6 +10,7 @@ Fields:
 - `repository` text
 - `pull_request_number` integer
 - `summary` text
+- `failure_reason` text nullable (terminal failure message when run status is `failed`)
 - `created_at` timestamptz
 - `updated_at` timestamptz
 

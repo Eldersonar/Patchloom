@@ -14,6 +14,7 @@ export const typeDefs = `#graphql
   type WorkflowRun {
     confidence: Float!
     createdAt: String!
+    failureReason: String
     followUpTasks: [String!]!
     id: ID!
     promptVersion: String!

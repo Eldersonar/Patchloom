@@ -22,6 +22,7 @@ import {
 import { registerGitHubWebhookRoute } from "./integrations/github-webhook-route";
 import { InMemoryRunStore } from "./workflow/run-store";
 import { InMemoryReviewGovernanceStore } from "./workflow/review-governance-store";
+import { ConsoleWorkflowLogger } from "./workflow/workflow-logger";
 
 interface Disposable {
   dispose: () => void | Promise<void>;
@@ -116,7 +117,9 @@ export async function startApiServer(
   appVersion: string,
   githubOptions: CreateGitHubPullRequestReaderOptions = {}
 ): Promise<{ subscriptionUrl: string; url: string }> {
-  const runStore = new InMemoryRunStore();
+  const runStore = new InMemoryRunStore({
+    logger: new ConsoleWorkflowLogger()
+  });
   const githubCommentPublisher = createGitHubCommentPublisher(githubOptions);
   const reviewGovernanceStore = new InMemoryReviewGovernanceStore({
     commentPublisher: githubCommentPublisher
