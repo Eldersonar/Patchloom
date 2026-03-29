@@ -16,6 +16,7 @@
     "@patchloom/ai": "workspace:*",
     "@patchloom/config": "workspace:*",
     "@patchloom/core": "workspace:*",
+    "@patchloom/integrations-github": "workspace:*",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "graphql": "^16.13.2",

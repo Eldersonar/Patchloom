@@ -39,6 +39,7 @@ This project aims to automate first-pass analysis while keeping human approval f
 - Typed env validation (`zod`) with tests.
 - API GraphQL skeleton with `health` query and tests.
 - API GraphQL run flow with `startPullRequestReview`, `getRun`, and `listRuns`.
+- API GraphQL manual trigger with `startPullRequestReviewFromUrl`.
 - API GraphQL subscription with `runUpdated(runId: ID!)`.
 - PR review workflow nodes producing summary, risks, suggested tests, follow-up tasks, and confidence.
 - Prompt/workflow version metadata and run artifacts (raw model responses + normalized output) stored in run state.
@@ -89,6 +90,9 @@ Required for current scaffold:
 - `MODEL_PROVIDER`
 - `GEMINI_MODEL`
 - `GEMINI_API_KEY`
+- `GITHUB_API_URL`
+- `GITHUB_TOKEN` (required for `startPullRequestReviewFromUrl` and private repos)
+- `GITHUB_WEBHOOK_SECRET` (required for `/webhooks/github` signature verification)
 - `DATABASE_URL`
 - `REDIS_URL`
 
@@ -111,6 +115,7 @@ The architecture is being built for external agent integration (for example, Ope
 - Query `getRun(id: ID!)`
 - Query `listRuns`
 - Mutation `startPullRequestReview(input: StartPullRequestReviewInput!)`
+- Mutation `startPullRequestReviewFromUrl(input: StartPullRequestReviewFromUrlInput!)`
 - Subscription `runUpdated(runId: ID!)`
 - `WorkflowRun` now includes `confidence`, `risks`, `suggestedTests`, `followUpTasks`, `promptVersion`, and `workflowVersion`.
 
@@ -118,6 +123,9 @@ The architecture is being built for external agent integration (for example, Ope
 - HTTP endpoint: `http://localhost:4000/graphql`
 - WebSocket endpoint: `ws://localhost:4000/graphql`
 - Reconnect strategy and usage notes: [`docs/subscriptions.md`](/home/simon/Documents/personal/Patchloom/docs/subscriptions.md)
+
+## GitHub Token Mode
+- Manual PR URL trigger docs: [`docs/github-integration.md`](/home/simon/Documents/personal/Patchloom/docs/github-integration.md)
 
 ## Roadmap (Near-Term)
 1. Run model + persistence schema (`WorkflowRun`, `Suggestion`, approvals)
