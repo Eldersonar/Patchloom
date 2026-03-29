@@ -209,22 +209,26 @@ export class InMemoryRunStore {
       }
 
       const updatedAt = new Date().toISOString();
+      const evidenceBackedOutput = createSuggestionsFromWorkflowOutput(
+        workflowResult.output,
+        updatedAt,
+        input.changedFiles
+      );
       const run: WorkflowRun = {
         ...existingRun,
         artifacts: workflowResult.artifacts,
         confidence: workflowResult.output.confidence,
         failureReason: null,
-        followUpTasks: workflowResult.output.followUpTasks,
+        followUpTasks: evidenceBackedOutput.followUpTasks,
         promptVersion: workflowResult.output.promptVersion,
-        risks: workflowResult.output.risks,
+        risks: evidenceBackedOutput.risks,
         status: "waiting_for_approval",
-        suggestedTests: workflowResult.output.suggestedTests,
+        suggestedTests: evidenceBackedOutput.suggestedTests,
         summary: workflowResult.output.summary,
+        suggestions: evidenceBackedOutput.suggestions,
         updatedAt,
         workflowVersion: workflowResult.output.workflowVersion
       };
-
-      run.suggestions = createSuggestionsFromWorkflowOutput(run, updatedAt);
 
       this.runs.set(runId, run);
       this.publishRunUpdated(run);

@@ -2,6 +2,8 @@ import { z } from "zod";
 
 import type { PullRequestReviewWorkflowInput } from "./pr-review-workflow";
 
+export type PullRequestType = "bugfix" | "feature" | "scaffold";
+
 export const LIST_OUTPUT_SCHEMA = z
   .object({
     items: z.array(z.unknown()).min(1).max(10)
@@ -39,8 +41,11 @@ export const LIST_OUTPUT_SCHEMA = z
   });
 
 export function buildSummaryPrompt(input: PullRequestReviewWorkflowInput): string {
+  const prType = classifyPullRequestType(input);
+
   return [
     "You are reviewing a software pull request.",
+    `Pull request type: ${prType}`,
     `Repository: ${input.repository}`,
     `Pull request: #${input.pullRequestNumber} ${input.pullRequestTitle}`,
     buildAdditionalContext(input),
@@ -52,12 +57,15 @@ export function buildSummaryPrompt(input: PullRequestReviewWorkflowInput): strin
 }
 
 export function buildRisksPrompt(input: PullRequestReviewWorkflowInput): string {
+  const prType = classifyPullRequestType(input);
+
   return [
     "You are reviewing pull request risk areas.",
+    `Pull request type: ${prType}`,
     `Repository: ${input.repository}`,
     `Pull request: #${input.pullRequestNumber} ${input.pullRequestTitle}`,
     buildAdditionalContext(input),
-    "Return JSON with key `items` as a list of 2-4 concrete risk areas.",
+    `Return JSON with key \`items\` as a list of ${riskCountByPrType(prType)} concrete risk areas.`,
     "Rules: plain string items only, each item <= 180 chars, avoid generic security boilerplate.",
     "Each risk must be traceable to provided files/description."
   ]
@@ -68,8 +76,11 @@ export function buildRisksPrompt(input: PullRequestReviewWorkflowInput): string 
 export function buildSuggestedTestsPrompt(
   input: PullRequestReviewWorkflowInput
 ): string {
+  const prType = classifyPullRequestType(input);
+
   return [
     "You are generating software test suggestions for a pull request.",
+    `Pull request type: ${prType}`,
     `Repository: ${input.repository}`,
     `Pull request: #${input.pullRequestNumber} ${input.pullRequestTitle}`,
     buildAdditionalContext(input),
@@ -81,8 +92,11 @@ export function buildSuggestedTestsPrompt(
 }
 
 export function buildFollowUpPrompt(input: PullRequestReviewWorkflowInput): string {
+  const prType = classifyPullRequestType(input);
+
   return [
     "You are proposing follow-up software engineering tasks.",
+    `Pull request type: ${prType}`,
     `Repository: ${input.repository}`,
     `Pull request: #${input.pullRequestNumber} ${input.pullRequestTitle}`,
     buildAdditionalContext(input),
@@ -107,6 +121,75 @@ function buildAdditionalContext(input: PullRequestReviewWorkflowInput): string {
   }
 
   return sections.join("\n\n");
+}
+
+/**
+ * Classifies pull requests to adjust suggestion strictness.
+ *
+ * @param input - Pull request input payload.
+ * @returns Classified pull request type.
+ */
+export function classifyPullRequestType(
+  input: PullRequestReviewWorkflowInput
+): PullRequestType {
+  const title = input.pullRequestTitle.toLowerCase();
+  const body = (input.pullRequestBody ?? "").toLowerCase();
+  const joined = `${title}\n${body}`;
+  const changedFiles = input.changedFiles ?? [];
+
+  if (containsAny(joined, ["fix", "bug", "regression", "hotfix", "incident"])) {
+    return "bugfix";
+  }
+
+  if (
+    containsAny(joined, [
+      "scaffold",
+      "bootstrap",
+      "initial",
+      "foundation",
+      "setup",
+      "monorepo"
+    ]) ||
+    looksLikeScaffoldByFiles(changedFiles)
+  ) {
+    return "scaffold";
+  }
+
+  return "feature";
+}
+
+/**
+ * Returns target risk count guidance by pull request type.
+ *
+ * @param prType - Classified pull request type.
+ * @returns Human-readable range used in prompts.
+ */
+function riskCountByPrType(prType: PullRequestType): string {
+  if (prType === "scaffold") {
+    return "2-3";
+  }
+
+  if (prType === "bugfix") {
+    return "2-4";
+  }
+
+  return "3-4";
+}
+
+function looksLikeScaffoldByFiles(changedFiles: string[]): boolean {
+  if (changedFiles.length < 8) {
+    return false;
+  }
+
+  const addedFileCount = changedFiles.filter((file) =>
+    file.toLowerCase().includes("(added")
+  ).length;
+
+  return addedFileCount >= Math.ceil(changedFiles.length * 0.6);
+}
+
+function containsAny(text: string, phrases: string[]): boolean {
+  return phrases.some((phrase) => text.includes(phrase));
 }
 
 export async function invokeWithRetries<T>(

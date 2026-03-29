@@ -228,6 +228,12 @@ button:disabled {
   color: var(--pending);
 }
 
+.source-ref-row {
+  color: var(--muted);
+  font-size: 0.86rem;
+  margin: 0.2rem 0 0.35rem;
+}
+
 .detail-box-list {
   display: grid;
   gap: 0.5rem;

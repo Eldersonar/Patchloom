@@ -79,6 +79,16 @@ export function RunDetailPanel(props: RunDetailPanelProps): ReactElement {
                 <p className={`approval-status approval-status--${decisionClass}`}>
                   Decision: {decisionClass}
                 </p>
+                {suggestion.sourceRefs.length > 0 ? (
+                  <p className="source-ref-row">
+                    <strong>Evidence:</strong>{" "}
+                    {suggestion.sourceRefs
+                      .map((ref) =>
+                        ref.lineHint ? `${ref.path}:${ref.lineHint}` : ref.path
+                      )
+                      .join(", ")}
+                  </p>
+                ) : null}
                 <div className="actions actions--inline">
                   <button
                     type="button"

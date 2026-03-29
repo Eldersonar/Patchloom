@@ -78,13 +78,45 @@ function normalizeItem(item: string, maxLength: number): string | null {
     return null;
   }
 
-  if (compact.length <= maxLength) {
-    return compact;
-  }
-
-  return `${compact.slice(0, maxLength - 3).trim()}...`;
+  return truncateItemToSentence(compact, maxLength);
 }
 
 function toDedupKey(item: string): string {
   return item.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function truncateItemToSentence(value: string, maxLength: number): string {
+  if (value.length <= maxLength) {
+    return value;
+  }
+
+  const sentences = value
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim())
+    .filter((sentence) => sentence.length > 0);
+
+  if (sentences.length > 1) {
+    let combined = "";
+
+    for (const sentence of sentences) {
+      const next = combined ? `${combined} ${sentence}` : sentence;
+
+      if (next.length > maxLength) {
+        break;
+      }
+
+      combined = next;
+    }
+
+    if (combined.length > 0) {
+      return combined;
+    }
+  }
+
+  const hardLimit = Math.max(3, maxLength - 3);
+  const fallback = value.slice(0, hardLimit);
+  const wordSafe = fallback.replace(/\s+\S*$/, "").trim();
+  const clipped = wordSafe.length >= Math.floor(maxLength * 0.5) ? wordSafe : fallback.trim();
+
+  return `${clipped}...`;
 }

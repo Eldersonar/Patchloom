@@ -24,6 +24,12 @@ export interface SuggestionView {
   content: string;
   id: string;
   kind: string;
+  sourceRefs: SourceRefView[];
+}
+
+export interface SourceRefView {
+  lineHint?: number | null;
+  path: string;
 }
 
 export interface ApprovalDecisionView {

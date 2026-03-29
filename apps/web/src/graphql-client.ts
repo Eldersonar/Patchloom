@@ -34,6 +34,10 @@ export async function fetchRuns(): Promise<WorkflowRunView[]> {
           id
           kind
           content
+          sourceRefs {
+            path
+            lineHint
+          }
         }
         risks
         suggestedTests
@@ -70,6 +74,10 @@ export async function startPullRequestReview(
           id
           kind
           content
+          sourceRefs {
+            path
+            lineHint
+          }
         }
         risks
         suggestedTests
@@ -113,6 +121,10 @@ export function subscribeRunUpdated(
             id
             kind
             content
+            sourceRefs {
+              path
+              lineHint
+            }
           }
           risks
           suggestedTests

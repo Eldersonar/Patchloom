@@ -2,6 +2,24 @@ import { randomUUID } from "node:crypto";
 
 import type { Suggestion, WorkflowRun } from "@patchloom/core";
 
+interface IndexedChangedFile {
+  keywords: string[];
+  lineHint?: number;
+  path: string;
+}
+
+interface SuggestionCandidate {
+  content: string;
+  kind: Suggestion["kind"];
+}
+
+export interface EvidenceBackedSuggestionOutput {
+  followUpTasks: string[];
+  risks: string[];
+  suggestedTests: string[];
+  suggestions: Suggestion[];
+}
+
 /**
  * Creates empty artifact containers for a new workflow run.
  *
@@ -33,29 +51,46 @@ export function createInitialArtifacts(): WorkflowRun["artifacts"] {
  * @returns Suggestion entities for risk/test/follow-up items.
  */
 export function createSuggestionsFromWorkflowOutput(
-  run: WorkflowRun,
-  createdAt: string
-): Suggestion[] {
-  return [
-    ...run.risks.map((risk) => ({
-      content: risk,
-      createdAt,
-      id: randomUUID(),
-      kind: "risk" as const
-    })),
-    ...run.suggestedTests.map((test) => ({
-      content: test,
-      createdAt,
-      id: randomUUID(),
-      kind: "test" as const
-    })),
-    ...run.followUpTasks.map((task) => ({
-      content: task,
-      createdAt,
-      id: randomUUID(),
-      kind: "follow_up" as const
-    }))
+  run: Pick<WorkflowRun, "followUpTasks" | "risks" | "suggestedTests">,
+  createdAt: string,
+  changedFiles?: string[]
+): EvidenceBackedSuggestionOutput {
+  const indexedFiles = indexChangedFiles(changedFiles);
+  const hasEvidenceContext = indexedFiles.length > 0;
+  const suggestionCandidates: SuggestionCandidate[] = [
+    ...run.risks.map((content) => ({ content, kind: "risk" as const })),
+    ...run.suggestedTests.map((content) => ({ content, kind: "test" as const })),
+    ...run.followUpTasks.map((content) => ({ content, kind: "follow_up" as const }))
   ];
+
+  const suggestions = suggestionCandidates
+    .map((candidate) => {
+      const sourceRefs = hasEvidenceContext
+        ? matchSuggestionEvidence(candidate.content, indexedFiles)
+        : [];
+
+      return {
+        content: candidate.content,
+        createdAt,
+        id: randomUUID(),
+        kind: candidate.kind,
+        sourceRefs
+      } satisfies Suggestion;
+    })
+    .filter((suggestion) => !hasEvidenceContext || suggestion.sourceRefs.length > 0);
+
+  return {
+    followUpTasks: suggestions
+      .filter((suggestion) => suggestion.kind === "follow_up")
+      .map((suggestion) => suggestion.content),
+    risks: suggestions
+      .filter((suggestion) => suggestion.kind === "risk")
+      .map((suggestion) => suggestion.content),
+    suggestedTests: suggestions
+      .filter((suggestion) => suggestion.kind === "test")
+      .map((suggestion) => suggestion.content),
+    suggestions
+  };
 }
 
 /**
@@ -205,4 +240,223 @@ function asNonEmptyString(value: unknown): string | null {
 
   const normalized = value.trim();
   return normalized.length > 0 ? normalized : null;
+}
+
+/**
+ * Builds parsed evidence index for changed files.
+ *
+ * @param changedFiles - Raw changed-file entries.
+ * @returns Parsed changed-file metadata for matching.
+ */
+function indexChangedFiles(changedFiles: string[] | undefined): IndexedChangedFile[] {
+  return (changedFiles ?? [])
+    .map((entry) => parseChangedFileEntry(entry))
+    .filter((entry): entry is IndexedChangedFile => Boolean(entry));
+}
+
+/**
+ * Parses a formatted changed-file string into searchable evidence metadata.
+ *
+ * @param entry - Formatted changed file string.
+ * @returns Indexed changed-file metadata or null when parsing fails.
+ */
+function parseChangedFileEntry(entry: string): IndexedChangedFile | null {
+  const normalized = entry.trim();
+
+  if (!normalized) {
+    return null;
+  }
+
+  const pathMatch = normalized.match(/^([^:\s][^:(]*?)(?:\s+\([^)]*\))?(?::\s+.*)?$/);
+  const path = pathMatch?.[1]?.trim() ?? "";
+
+  if (!path) {
+    return null;
+  }
+
+  const lineHint = parsePatchLineHint(normalized);
+  const keywords = extractKeywords(`${path} ${normalized}`);
+
+  if (keywords.length === 0) {
+    return null;
+  }
+
+  return {
+    keywords,
+    lineHint,
+    path
+  };
+}
+
+/**
+ * Extracts changed-side hunk line hints from unified diff snippets.
+ *
+ * @param value - Changed-file entry with optional patch hunk.
+ * @returns Suggested changed-side line hint when present.
+ */
+function parsePatchLineHint(value: string): number | undefined {
+  const hunkMatch = value.match(/@@\s*-\d+(?:,\d+)?\s+\+(\d+)(?:,\d+)?\s*@@/);
+
+  if (!hunkMatch?.[1]) {
+    return undefined;
+  }
+
+  const parsed = Number.parseInt(hunkMatch[1], 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+/**
+ * Matches suggestion text to changed files via keyword overlap.
+ *
+ * @param content - Suggestion content.
+ * @param indexedFiles - Indexed changed-file metadata.
+ * @returns Ranked source refs tied to changed files.
+ */
+function matchSuggestionEvidence(
+  content: string,
+  indexedFiles: IndexedChangedFile[]
+): Suggestion["sourceRefs"] {
+  const contentKeywords = extractKeywords(content);
+
+  if (contentKeywords.length === 0) {
+    return [];
+  }
+
+  const scored = indexedFiles
+    .map((entry) => ({
+      lineHint: entry.lineHint,
+      path: entry.path,
+      score: overlapScore(contentKeywords, entry.keywords)
+    }))
+    .filter((entry) => entry.score > 0)
+    .sort((left, right) => right.score - left.score || left.path.localeCompare(right.path));
+
+  if (scored.length === 0) {
+    return [];
+  }
+
+  return scored.slice(0, 2).map((entry) => ({
+    lineHint: entry.lineHint,
+    path: entry.path
+  }));
+}
+
+/**
+ * Calculates overlap score between suggestion and changed-file keywords.
+ *
+ * @param contentKeywords - Suggestion keywords.
+ * @param fileKeywords - Changed-file keywords.
+ * @returns Positive overlap score.
+ */
+function overlapScore(contentKeywords: string[], fileKeywords: string[]): number {
+  const fileSet = new Set(fileKeywords);
+  let score = 0;
+
+  for (const keyword of contentKeywords) {
+    if (fileSet.has(keyword)) {
+      score += 1;
+    }
+  }
+
+  return score;
+}
+
+/**
+ * Converts arbitrary text into deduplicated searchable keywords.
+ *
+ * @param input - Raw text value.
+ * @returns Normalized keyword list.
+ */
+function extractKeywords(input: string): string[] {
+  const normalized = input
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+  if (!normalized) {
+    return [];
+  }
+
+  const stopWords = new Set([
+    "add",
+    "after",
+    "all",
+    "and",
+    "are",
+    "can",
+    "check",
+    "cover",
+    "create",
+    "data",
+    "edge",
+    "file",
+    "flow",
+    "for",
+    "from",
+    "handling",
+    "in",
+    "into",
+    "issue",
+    "its",
+    "may",
+    "new",
+    "of",
+    "on",
+    "or",
+    "path",
+    "review",
+    "risk",
+    "session",
+    "task",
+    "test",
+    "that",
+    "the",
+    "this",
+    "to",
+    "update",
+    "with"
+  ]);
+
+  const deduped = new Set<string>();
+
+  for (const token of normalized.split(/\s+/)) {
+    if (token.length < 3 || /^\d+$/.test(token) || stopWords.has(token)) {
+      continue;
+    }
+
+    const normalizedToken = normalizeToken(token);
+
+    if (normalizedToken.length >= 3 && !stopWords.has(normalizedToken)) {
+      deduped.add(normalizedToken);
+    }
+  }
+
+  return [...deduped];
+}
+
+/**
+ * Applies lightweight stemming to improve token overlap.
+ *
+ * @param token - Raw token.
+ * @returns Normalized token.
+ */
+function normalizeToken(token: string): string {
+  if (token.length > 6 && token.endsWith("ing")) {
+    return token.slice(0, -3);
+  }
+
+  if (token.length > 5 && token.endsWith("ed")) {
+    return token.slice(0, -2);
+  }
+
+  if (token.length > 4 && token.endsWith("es")) {
+    return token.slice(0, -2);
+  }
+
+  if (token.length > 4 && token.endsWith("s")) {
+    return token.slice(0, -1);
+  }
+
+  return token;
 }

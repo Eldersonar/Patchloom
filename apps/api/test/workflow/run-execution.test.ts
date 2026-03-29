@@ -56,6 +56,9 @@ describe("run workflow execution", () => {
       "test",
       "follow_up"
     ]);
+    expect(completedRun.suggestions.every((item) => item.sourceRefs.length === 0)).toBe(
+      true
+    );
     expect(completedRun.artifacts.rawModelResponses.risks).toContain("items");
 
     runStore.dispose();
@@ -120,6 +123,86 @@ describe("run workflow execution", () => {
       "Model output validation failed at items.0"
     );
     expect(failedRun.failureReason).toContain("+1 more issues");
+    runStore.dispose();
+  });
+
+  it("attaches source refs and filters unsupported suggestions when changed files are available", async () => {
+    const runStore = new InMemoryRunStore({
+      autoProgress: true,
+      lifecycleDelayMs: 5,
+      workflowExecutor: async () => ({
+        artifacts: {
+          normalizedOutput: {
+            confidence: 0.78,
+            followUpTasks: [
+              "Document cache invalidation rationale for auth/session module.",
+              "Schedule roadmap brainstorming sync."
+            ],
+            risks: [
+              "Token refresh logic may fail near expiry boundaries.",
+              "Completely unrelated hardware procurement process."
+            ],
+            suggestedTests: [
+              "Add integration test for profile cache refresh after update."
+            ],
+            summary: "PR updates auth refresh and profile cache behavior."
+          },
+          rawModelResponses: {
+            followUpTasks:
+              '{"items":["Document cache invalidation rationale for auth/session module.","Schedule roadmap brainstorming sync."]}',
+            risks:
+              '{"items":["Token refresh logic may fail near expiry boundaries.","Completely unrelated hardware procurement process."]}',
+            suggestedTests:
+              '{"items":["Add integration test for profile cache refresh after update."]}',
+            summary: "PR updates auth refresh and profile cache behavior."
+          }
+        },
+        output: {
+          confidence: 0.78,
+          followUpTasks: [
+            "Document cache invalidation rationale for auth/session module.",
+            "Schedule roadmap brainstorming sync."
+          ],
+          promptVersion: "pr-review-prompts/v1",
+          risks: [
+            "Token refresh logic may fail near expiry boundaries.",
+            "Completely unrelated hardware procurement process."
+          ],
+          suggestedTests: [
+            "Add integration test for profile cache refresh after update."
+          ],
+          summary: "PR updates auth refresh and profile cache behavior.",
+          workflowVersion: "pr-review-workflow/v1"
+        }
+      })
+    });
+
+    const run = runStore.startPullRequestReview({
+      changedFiles: [
+        "src/auth/session.ts (modified, +12/-4): @@ -17,7 +17,9 @@ if (expired) refreshToken(user)",
+        "src/profile/cache.ts (modified, +8/-1): @@ -42,5 +42,8 @@ profileCache.set(userId, nextValue)"
+      ],
+      pullRequestNumber: 21,
+      pullRequestTitle: "Improve auth refresh and profile cache handling",
+      repository: "acme/auth-service"
+    });
+
+    const completedRun = await waitForRunStatus(runStore, run.id, "completed");
+
+    expect(completedRun.risks).toEqual([
+      "Token refresh logic may fail near expiry boundaries."
+    ]);
+    expect(completedRun.followUpTasks).toEqual([
+      "Document cache invalidation rationale for auth/session module."
+    ]);
+    expect(completedRun.suggestedTests).toEqual([
+      "Add integration test for profile cache refresh after update."
+    ]);
+    expect(completedRun.suggestions).toHaveLength(3);
+    expect(completedRun.suggestions.every((item) => item.sourceRefs.length > 0)).toBe(
+      true
+    );
+
     runStore.dispose();
   });
 });

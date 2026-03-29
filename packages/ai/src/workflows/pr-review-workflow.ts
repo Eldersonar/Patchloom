@@ -9,8 +9,10 @@ import {
   buildRisksPrompt,
   buildSuggestedTestsPrompt,
   buildSummaryPrompt,
+  classifyPullRequestType,
   invokeWithRetries,
-  normalizeConfidence
+  normalizeConfidence,
+  type PullRequestType
 } from "./pr-review-workflow-helpers";
 import {
   refineGeneratedItems,
@@ -59,6 +61,15 @@ export interface PullRequestReviewWorkflowOptions {
   workflowVersion?: string;
 }
 
+interface PullRequestGenerationPolicy {
+  maxFollowUpTasks: number;
+  maxFollowUpTaskLength: number;
+  maxRiskLength: number;
+  maxRisks: number;
+  maxSuggestedTests: number;
+  maxTestLength: number;
+}
+
 /**
  * Generates a PR summary node output.
  *
@@ -94,7 +105,9 @@ export async function generateSummaryNode(
 export async function generateRisksNode(
   provider: ModelProvider,
   input: PullRequestReviewWorkflowInput,
-  temperature?: number
+  temperature?: number,
+  maxItems = 4,
+  maxLength = 180
 ): Promise<{ raw: StructuredGenerationResult<{ items: string[] }>; risks: string[] }> {
   const raw = await provider.generateStructured({
     prompt: buildRisksPrompt(input),
@@ -105,8 +118,8 @@ export async function generateRisksNode(
   return {
     raw,
     risks: refineGeneratedItems(raw.data.items, {
-      maxItems: 4,
-      maxLength: 180
+      maxItems,
+      maxLength
     })
   };
 }
@@ -122,7 +135,9 @@ export async function generateRisksNode(
 export async function generateSuggestedTestsNode(
   provider: ModelProvider,
   input: PullRequestReviewWorkflowInput,
-  temperature?: number
+  temperature?: number,
+  maxItems = 5,
+  maxLength = 180
 ): Promise<{
   raw: StructuredGenerationResult<{ items: string[] }>;
   suggestedTests: string[];
@@ -136,8 +151,8 @@ export async function generateSuggestedTestsNode(
   return {
     raw,
     suggestedTests: refineGeneratedItems(raw.data.items, {
-      maxItems: 5,
-      maxLength: 180
+      maxItems,
+      maxLength
     })
   };
 }
@@ -153,7 +168,9 @@ export async function generateSuggestedTestsNode(
 export async function generateFollowUpTasksNode(
   provider: ModelProvider,
   input: PullRequestReviewWorkflowInput,
-  temperature?: number
+  temperature?: number,
+  maxItems = 3,
+  maxLength = 180
 ): Promise<{
   followUpTasks: string[];
   raw: StructuredGenerationResult<{ items: string[] }>;
@@ -166,8 +183,8 @@ export async function generateFollowUpTasksNode(
 
   return {
     followUpTasks: refineGeneratedItems(raw.data.items, {
-      maxItems: 3,
-      maxLength: 180
+      maxItems,
+      maxLength
     }),
     raw
   };
@@ -210,6 +227,8 @@ export async function runPullRequestReviewWorkflow(
   const promptVersion = options.promptVersion ?? "pr-review-prompts/v1";
   const workflowVersion = options.workflowVersion ?? "pr-review-workflow/v1";
   const maxRetries = options.maxRetries ?? 1;
+  const pullRequestType = classifyPullRequestType(options.input);
+  const policy = getGenerationPolicyByPullRequestType(pullRequestType);
 
   const summaryNode = await invokeWithRetries(
     () =>
@@ -217,17 +236,36 @@ export async function runPullRequestReviewWorkflow(
     maxRetries
   );
   const risksNode = await invokeWithRetries(
-    () => generateRisksNode(options.provider, options.input, options.temperature),
+    () =>
+      generateRisksNode(
+        options.provider,
+        options.input,
+        options.temperature,
+        policy.maxRisks,
+        policy.maxRiskLength
+      ),
     maxRetries
   );
   const testsNode = await invokeWithRetries(
     () =>
-      generateSuggestedTestsNode(options.provider, options.input, options.temperature),
+      generateSuggestedTestsNode(
+        options.provider,
+        options.input,
+        options.temperature,
+        policy.maxSuggestedTests,
+        policy.maxTestLength
+      ),
     maxRetries
   );
   const followUpNode = await invokeWithRetries(
     () =>
-      generateFollowUpTasksNode(options.provider, options.input, options.temperature),
+      generateFollowUpTasksNode(
+        options.provider,
+        options.input,
+        options.temperature,
+        policy.maxFollowUpTasks,
+        policy.maxFollowUpTaskLength
+      ),
     maxRetries
   );
 
@@ -259,5 +297,46 @@ export async function runPullRequestReviewWorkflow(
       promptVersion,
       workflowVersion
     }
+  };
+}
+
+/**
+ * Maps pull request type to generation limits.
+ *
+ * @param pullRequestType - Classified pull request type.
+ * @returns Generation policy for risk/test/follow-up caps.
+ */
+function getGenerationPolicyByPullRequestType(
+  pullRequestType: PullRequestType
+): PullRequestGenerationPolicy {
+  if (pullRequestType === "scaffold") {
+    return {
+      maxFollowUpTasks: 2,
+      maxFollowUpTaskLength: 170,
+      maxRiskLength: 170,
+      maxRisks: 3,
+      maxSuggestedTests: 4,
+      maxTestLength: 170
+    };
+  }
+
+  if (pullRequestType === "bugfix") {
+    return {
+      maxFollowUpTasks: 2,
+      maxFollowUpTaskLength: 180,
+      maxRiskLength: 180,
+      maxRisks: 4,
+      maxSuggestedTests: 5,
+      maxTestLength: 180
+    };
+  }
+
+  return {
+    maxFollowUpTasks: 3,
+    maxFollowUpTaskLength: 180,
+    maxRiskLength: 180,
+    maxRisks: 4,
+    maxSuggestedTests: 5,
+    maxTestLength: 180
   };
 }

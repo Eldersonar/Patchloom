@@ -9,6 +9,12 @@ export const typeDefs = `#graphql
     createdAt: String!
     id: ID!
     kind: String!
+    sourceRefs: [SourceRef!]!
+  }
+
+  type SourceRef {
+    lineHint: Int
+    path: String!
   }
 
   type WorkflowRun {

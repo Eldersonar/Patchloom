@@ -23,6 +23,12 @@ export interface Suggestion {
   createdAt: string;
   id: string;
   kind: "risk" | "summary" | "test" | "follow_up";
+  sourceRefs: SuggestionSourceRef[];
+}
+
+export interface SuggestionSourceRef {
+  lineHint?: number;
+  path: string;
 }
 
 export interface WorkflowRun {

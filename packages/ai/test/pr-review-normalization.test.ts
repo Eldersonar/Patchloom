@@ -33,4 +33,17 @@ describe("pr-review-normalization", () => {
     expect(summary).toContain("Sentence three");
     expect(summary).not.toContain("Sentence four");
   });
+
+  it("truncates long generated items at sentence boundaries", () => {
+    const refined = refineGeneratedItems(
+      [
+        "Validate token rotation on refresh boundaries. Ensure revoked token path does not re-authenticate stale sessions. Add rollback checks for auth edge failures."
+      ],
+      { maxItems: 3, maxLength: 95 }
+    );
+
+    expect(refined).toEqual([
+      "Validate token rotation on refresh boundaries."
+    ]);
+  });
 });
