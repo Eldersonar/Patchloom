@@ -230,6 +230,12 @@ export class InMemoryRunStore {
     runId: string,
     input: StartPullRequestReviewInput
   ): Promise<void> {
+    logRunEvent("workflow_started", {
+      pullRequestNumber: input.pullRequestNumber,
+      repository: input.repository,
+      runId
+    });
+
     try {
       this.transitionRunStatus(runId, "running");
 
@@ -260,6 +266,11 @@ export class InMemoryRunStore {
 
       this.runs.set(runId, run);
       this.publishRunUpdated(run);
+      logRunEvent("workflow_waiting_for_approval", {
+        pullRequestNumber: run.pullRequestNumber,
+        repository: run.repository,
+        runId
+      });
       this.scheduleCompletion(runId);
     } catch (error) {
       try {
@@ -275,7 +286,12 @@ export class InMemoryRunStore {
       this.scheduledTimers.delete(timer);
 
       try {
-        this.transitionRunStatus(runId, "completed");
+        const completedRun = this.transitionRunStatus(runId, "completed");
+        logRunEvent("workflow_completed", {
+          pullRequestNumber: completedRun.pullRequestNumber,
+          repository: completedRun.repository,
+          runId
+        });
       } catch {
         // Ignore failures for disposed or missing runs in development mode.
       }
@@ -304,6 +320,13 @@ export class InMemoryRunStore {
 
     this.runs.set(runId, failedRun);
     this.publishRunUpdated(failedRun);
+    logRunEvent("workflow_failed", {
+      error: serializeError(error),
+      failureReason: failedRun.failureReason,
+      pullRequestNumber: failedRun.pullRequestNumber,
+      repository: failedRun.repository,
+      runId
+    });
   }
 }
 
@@ -313,4 +336,45 @@ function toFailureReason(error: unknown): string {
   }
 
   return "Workflow execution failed.";
+}
+
+/**
+ * Emits a single-line structured log event for workflow execution.
+ *
+ * @param event - Event name.
+ * @param payload - Event fields.
+ */
+function logRunEvent(event: string, payload: Record<string, unknown>): void {
+  if (process.env.NODE_ENV === "test" || process.env.VITEST === "true") {
+    return;
+  }
+
+  console.log(
+    JSON.stringify({
+      event,
+      scope: "workflow_run",
+      timestamp: new Date().toISOString(),
+      ...payload
+    })
+  );
+}
+
+/**
+ * Serializes unknown errors for structured logs.
+ *
+ * @param error - Unknown error value.
+ * @returns Serializable error payload.
+ */
+function serializeError(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+      name: error.name,
+      stack: error.stack
+    };
+  }
+
+  return {
+    value: String(error)
+  };
 }

@@ -108,6 +108,18 @@ docker compose up postgres redis
 4. In the form, enter `owner/repo` (or GitHub PR URL) plus PR number.
 5. Start run and confirm the run fails for invalid PR numbers and succeeds for real PRs.
 
+### Troubleshooting Run Failures
+Inspect API logs:
+```bash
+docker compose logs -f api
+```
+
+Look for structured events:
+- `workflow_started`
+- `workflow_waiting_for_approval`
+- `workflow_completed`
+- `workflow_failed` (includes `failureReason` and error details)
+
 ## GitHub Webhook Setup
 Patchloom expects GitHub webhooks at:
 - `https://<your-domain>/webhooks/github`
