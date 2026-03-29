@@ -4,8 +4,8 @@ Open-source, self-hostable assistant for engineering workflows. It provides a Gr
 
 ## Current Status
 - Phase 0 foundation is implemented.
-- Phase 1 core API skeleton is in progress.
-- Current API includes run operations: `startPullRequestReview`, `getRun`, and `listRuns`.
+- Phase 1 core API skeleton is implemented.
+- Current API includes run lifecycle transitions, `runUpdated` subscription events, and structured PR workflow outputs.
 
 ## Why This Project Exists
 Engineering teams spend too much time on repetitive coordination around code changes:
@@ -28,6 +28,7 @@ This project aims to automate first-pass analysis while keeping human approval f
 - `apps/api` GraphQL API service
 - `apps/web` React web shell
 - `packages/config` env parsing and validation
+- `packages/ai` provider abstraction and adapters
 - `packages/core` shared workflow types
 - `packages/db` DB connection utilities
 - `packages/db/migrations` SQL migration files
@@ -38,7 +39,11 @@ This project aims to automate first-pass analysis while keeping human approval f
 - Typed env validation (`zod`) with tests.
 - API GraphQL skeleton with `health` query and tests.
 - API GraphQL run flow with `startPullRequestReview`, `getRun`, and `listRuns`.
+- API GraphQL subscription with `runUpdated(runId: ID!)`.
+- PR review workflow nodes producing summary, risks, suggested tests, follow-up tasks, and confidence.
+- Prompt/workflow version metadata and run artifacts (raw model responses + normalized output) stored in run state.
 - In-memory run store for development and test workflows.
+- Provider-agnostic AI interface with Gemini adapter and factory wiring.
 - DB connection check utility with tests.
 - Initial SQL migration and domain model documentation.
 - Docker Compose setup for Postgres and Redis.
@@ -82,6 +87,8 @@ Required for current scaffold:
 - `NODE_ENV`
 - `PORT`
 - `MODEL_PROVIDER`
+- `GEMINI_MODEL`
+- `GEMINI_API_KEY`
 - `DATABASE_URL`
 - `REDIS_URL`
 
@@ -104,6 +111,13 @@ The architecture is being built for external agent integration (for example, Ope
 - Query `getRun(id: ID!)`
 - Query `listRuns`
 - Mutation `startPullRequestReview(input: StartPullRequestReviewInput!)`
+- Subscription `runUpdated(runId: ID!)`
+- `WorkflowRun` now includes `confidence`, `risks`, `suggestedTests`, `followUpTasks`, `promptVersion`, and `workflowVersion`.
+
+## Subscriptions
+- HTTP endpoint: `http://localhost:4000/graphql`
+- WebSocket endpoint: `ws://localhost:4000/graphql`
+- Reconnect strategy and usage notes: [`docs/subscriptions.md`](/home/simon/Documents/personal/Patchloom/docs/subscriptions.md)
 
 ## Roadmap (Near-Term)
 1. Run model + persistence schema (`WorkflowRun`, `Suggestion`, approvals)

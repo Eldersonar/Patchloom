@@ -11,8 +11,16 @@
   },
   "dependencies": {
     "@apollo/server": "^5.0.0",
+    "@as-integrations/express5": "^1.1.2",
+    "@graphql-tools/schema": "^10.0.25",
+    "@patchloom/ai": "workspace:*",
     "@patchloom/config": "workspace:*",
     "@patchloom/core": "workspace:*",
-    "graphql": "^16.11.0"
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "graphql": "^16.13.2",
+    "graphql-subscriptions": "^3.0.0",
+    "graphql-ws": "^6.0.6",
+    "ws": "^8.18.3"
   }
 }
