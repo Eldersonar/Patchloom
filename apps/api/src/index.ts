@@ -11,7 +11,8 @@ export async function bootstrap(): Promise<void> {
   const env = loadEnvironment();
   const started = await startApiServer(env.PORT, env.APP_VERSION, {
     githubApiUrl: env.GITHUB_API_URL,
-    githubToken: env.GITHUB_TOKEN
+    githubToken: env.GITHUB_TOKEN,
+    githubWebhookSecret: env.GITHUB_WEBHOOK_SECRET
   });
 
   console.log(`API running at ${started.url}`);

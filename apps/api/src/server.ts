@@ -22,6 +22,7 @@ import {
   type CreateGitHubPullRequestReaderOptions,
   type GitHubPullRequestReader
 } from "./integrations/github-reader";
+import { registerGitHubWebhookRoute } from "./integrations/github-webhook-route";
 import {
   InMemoryRunStore,
   type RunUpdatedEvent
@@ -225,6 +226,11 @@ export async function startApiServer(
   );
 
   await server.start();
+
+  registerGitHubWebhookRoute(app, {
+    runStore,
+    webhookSecret: githubOptions.githubWebhookSecret
+  });
 
   app.use(
     "/graphql",

@@ -8,6 +8,7 @@ export type GitHubPullRequestReader = Pick<
 export interface CreateGitHubPullRequestReaderOptions {
   githubApiUrl?: string;
   githubToken?: string;
+  githubWebhookSecret?: string;
 }
 
 /**

@@ -92,6 +92,7 @@ Required for current scaffold:
 - `GEMINI_API_KEY`
 - `GITHUB_API_URL`
 - `GITHUB_TOKEN` (required for `startPullRequestReviewFromUrl` and private repos)
+- `GITHUB_WEBHOOK_SECRET` (required for `/webhooks/github` signature verification)
 - `DATABASE_URL`
 - `REDIS_URL`
 
