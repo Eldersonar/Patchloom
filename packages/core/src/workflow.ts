@@ -28,6 +28,7 @@ export interface Suggestion {
 export interface WorkflowRun {
   confidence: number;
   createdAt: string;
+  failureReason?: string | null;
   followUpTasks: string[];
   id: string;
   promptVersion: string;

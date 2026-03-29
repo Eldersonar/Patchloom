@@ -50,6 +50,11 @@ export function RunDetailPanel(props: RunDetailPanelProps): ReactElement {
       <p>
         <strong>Summary:</strong> {props.run.summary}
       </p>
+      {props.run.status === "failed" && props.run.failureReason ? (
+        <p className="error">
+          <strong>Failure:</strong> {props.run.failureReason}
+        </p>
+      ) : null}
 
       <section>
         <h3>Suggestion Approvals</h3>

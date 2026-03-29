@@ -40,6 +40,7 @@ describe("workflow run flow", () => {
               repository
               pullRequestNumber
               status
+              failureReason
               summary
               confidence
               promptVersion
@@ -78,6 +79,7 @@ describe("workflow run flow", () => {
       pullRequestNumber: number;
       repository: string;
       status: string;
+      failureReason: string | null;
       confidence: number;
       promptVersion: string;
       workflowVersion: string;
@@ -88,6 +90,7 @@ describe("workflow run flow", () => {
     expect(createdRun.repository).toBe("acme/service-api");
     expect(createdRun.pullRequestNumber).toBe(21);
     expect(createdRun.status).toBe("queued");
+    expect(createdRun.failureReason).toBeNull();
     expect(createdRun.confidence).toBe(0);
     expect(createdRun.promptVersion).toBe("pr-review-prompts/v1");
     expect(createdRun.workflowVersion).toBe("pr-review-workflow/v1");

@@ -1,6 +1,7 @@
 export interface WorkflowRunView {
   confidence: number;
   createdAt: string;
+  failureReason?: string | null;
   followUpTasks: string[];
   id: string;
   pullRequestNumber: number;

@@ -27,6 +27,7 @@ export async function fetchRuns(): Promise<WorkflowRunView[]> {
         status
         workflowType
         createdAt
+        failureReason
         summary
         confidence
         suggestions {
@@ -62,6 +63,7 @@ export async function startPullRequestReview(
         status
         workflowType
         createdAt
+        failureReason
         summary
         confidence
         suggestions {
@@ -104,6 +106,7 @@ export function subscribeRunUpdated(
           status
           workflowType
           createdAt
+          failureReason
           summary
           confidence
           suggestions {

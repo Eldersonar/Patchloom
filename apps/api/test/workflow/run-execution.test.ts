@@ -78,6 +78,7 @@ describe("run workflow execution", () => {
 
     const failedRun = await waitForRunStatus(runStore, run.id, "failed");
 
+    expect(failedRun.failureReason).toContain("workflow failure");
     expect(failedRun.status).toBe("failed");
     expect(failedRun.summary).toContain("Adjust billing retries");
 

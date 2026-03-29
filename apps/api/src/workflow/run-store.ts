@@ -72,6 +72,7 @@ export class InMemoryRunStore {
       artifacts: this.createInitialArtifacts(),
       confidence: 0,
       createdAt: now,
+      failureReason: null,
       followUpTasks: [],
       id: randomUUID(),
       promptVersion: "pr-review-prompts/v1",
@@ -244,6 +245,7 @@ export class InMemoryRunStore {
         ...existingRun,
         artifacts: workflowResult.artifacts,
         confidence: workflowResult.output.confidence,
+        failureReason: null,
         followUpTasks: workflowResult.output.followUpTasks,
         promptVersion: workflowResult.output.promptVersion,
         risks: workflowResult.output.risks,
@@ -259,9 +261,9 @@ export class InMemoryRunStore {
       this.runs.set(runId, run);
       this.publishRunUpdated(run);
       this.scheduleCompletion(runId);
-    } catch {
+    } catch (error) {
       try {
-        this.transitionRunStatus(runId, "failed");
+        this.markRunFailed(runId, error);
       } catch {
         // Ignore failures for disposed or missing runs in development mode.
       }
@@ -281,4 +283,34 @@ export class InMemoryRunStore {
 
     this.scheduledTimers.add(timer);
   }
+
+  private markRunFailed(runId: string, error: unknown): void {
+    const existingRun = this.runs.get(runId);
+
+    if (!existingRun) {
+      return;
+    }
+
+    if (!canTransitionRunStatus(existingRun.status, "failed")) {
+      throw new Error(`Invalid transition from ${existingRun.status} to failed`);
+    }
+
+    const failedRun: WorkflowRun = {
+      ...existingRun,
+      failureReason: toFailureReason(error),
+      status: "failed",
+      updatedAt: new Date().toISOString()
+    };
+
+    this.runs.set(runId, failedRun);
+    this.publishRunUpdated(failedRun);
+  }
+}
+
+function toFailureReason(error: unknown): string {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message.trim();
+  }
+
+  return "Workflow execution failed.";
 }
