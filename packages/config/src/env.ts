@@ -3,6 +3,8 @@ import { z } from "zod";
 const envSchema = z.object({
   APP_VERSION: z.string().default("0.1.0"),
   DATABASE_URL: z.string().url(),
+  GITHUB_API_URL: z.string().url().default("https://api.github.com"),
+  GITHUB_TOKEN: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
   GEMINI_MODEL: z.string().default("gemini-2.5-flash"),
   MODEL_PROVIDER: z.enum(["gemini", "openai", "anthropic"]).default("gemini"),

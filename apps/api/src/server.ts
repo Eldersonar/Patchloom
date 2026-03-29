@@ -16,6 +16,12 @@ import type { GraphQLSchema } from "graphql";
 import { useServer } from "graphql-ws/use/ws";
 import { WebSocketServer } from "ws";
 
+import { typeDefs } from "./graphql/type-defs";
+import {
+  createGitHubPullRequestReader,
+  type CreateGitHubPullRequestReaderOptions,
+  type GitHubPullRequestReader
+} from "./integrations/github-reader";
 import {
   InMemoryRunStore,
   type RunUpdatedEvent
@@ -31,72 +37,23 @@ export interface HealthResponse {
 }
 
 export interface GraphQLContext {
+  githubPullRequestReader: GitHubPullRequestReader | null;
   requestId: string;
   runStore: InMemoryRunStore;
 }
-
-const typeDefs = `#graphql
-  type Health {
-    status: String!
-    version: String!
-  }
-
-  type Suggestion {
-    content: String!
-    createdAt: String!
-    id: ID!
-    kind: String!
-  }
-
-  type WorkflowRun {
-    confidence: Float!
-    createdAt: String!
-    followUpTasks: [String!]!
-    id: ID!
-    promptVersion: String!
-    pullRequestNumber: Int!
-    repository: String!
-    risks: [String!]!
-    status: String!
-    suggestedTests: [String!]!
-    suggestions: [Suggestion!]!
-    summary: String!
-    updatedAt: String!
-    workflowVersion: String!
-    workflowType: String!
-  }
-
-  input StartPullRequestReviewInput {
-    pullRequestNumber: Int!
-    pullRequestTitle: String!
-    repository: String!
-  }
-
-  type Query {
-    getRun(id: ID!): WorkflowRun
-    health: Health!
-    listRuns: [WorkflowRun!]!
-  }
-
-  type Mutation {
-    startPullRequestReview(input: StartPullRequestReviewInput!): WorkflowRun!
-  }
-
-  type Subscription {
-    runUpdated(runId: ID!): WorkflowRun!
-  }
-`;
 
 /**
  * Creates executable GraphQL schema for HTTP and subscription transports.
  *
  * @param appVersion - Service version string returned by health query.
  * @param runStore - Run store implementation used by workflow resolvers.
+ * @param githubPullRequestReader - GitHub reader for PR URL triggered workflow runs.
  * @returns Executable GraphQL schema.
  */
 export function createGraphQLSchema(
   appVersion: string,
-  runStore: InMemoryRunStore
+  runStore: InMemoryRunStore,
+  githubPullRequestReader: GitHubPullRequestReader | null = null
 ): GraphQLSchema {
   return makeExecutableSchema({
     resolvers: {
@@ -106,7 +63,31 @@ export function createGraphQLSchema(
           args: { input: StartPullRequestReviewInput },
           context: GraphQLContext
         ): WorkflowRun =>
-          (context.runStore ?? runStore).startPullRequestReview(args.input)
+          (context.runStore ?? runStore).startPullRequestReview(args.input),
+        startPullRequestReviewFromUrl: async (
+          _: unknown,
+          args: { input: { pullRequestUrl: string } },
+          context: GraphQLContext
+        ): Promise<WorkflowRun> => {
+          const reader =
+            context.githubPullRequestReader ?? githubPullRequestReader;
+
+          if (!reader) {
+            throw new Error(
+              "GitHub token integration is not configured. Set GITHUB_TOKEN."
+            );
+          }
+
+          const details = await reader.fetchPullRequestByUrl(
+            args.input.pullRequestUrl
+          );
+
+          return (context.runStore ?? runStore).startPullRequestReview({
+            pullRequestNumber: details.pullRequestNumber,
+            pullRequestTitle: details.pullRequestTitle,
+            repository: details.repository
+          });
+        }
       },
       Query: {
         getRun: (
@@ -162,13 +143,15 @@ export function createGraphQLSchema(
  * @param runStore - Run store implementation used by workflow resolvers.
  * @param httpServer - Optional HTTP server for graceful draining.
  * @param wsServerCleanup - Optional WebSocket cleanup hook.
+ * @param githubPullRequestReader - GitHub reader for PR URL triggered workflow runs.
  * @returns Apollo server instance.
  */
 export function createGraphQLServer(
   appVersion: string,
   runStore: InMemoryRunStore = new InMemoryRunStore(),
   httpServer?: Server,
-  wsServerCleanup?: Disposable
+  wsServerCleanup?: Disposable,
+  githubPullRequestReader: GitHubPullRequestReader | null = null
 ): ApolloServer<GraphQLContext> {
   const plugins = [];
 
@@ -190,7 +173,7 @@ export function createGraphQLServer(
 
   return new ApolloServer<GraphQLContext>({
     plugins,
-    schema: createGraphQLSchema(appVersion, runStore)
+    schema: createGraphQLSchema(appVersion, runStore, githubPullRequestReader)
   });
 }
 
@@ -199,16 +182,23 @@ export function createGraphQLServer(
  *
  * @param port - Port where the server should listen.
  * @param appVersion - Service version string for health query.
+ * @param githubOptions - Optional GitHub integration options.
  * @returns Running server URL and subscription URL.
  */
 export async function startApiServer(
   port: number,
-  appVersion: string
+  appVersion: string,
+  githubOptions: CreateGitHubPullRequestReaderOptions = {}
 ): Promise<{ subscriptionUrl: string; url: string }> {
   const runStore = new InMemoryRunStore();
+  const githubPullRequestReader = createGitHubPullRequestReader(githubOptions);
   const app = express();
   const httpServer = createServer(app);
-  const subscriptionSchema = createGraphQLSchema(appVersion, runStore);
+  const subscriptionSchema = createGraphQLSchema(
+    appVersion,
+    runStore,
+    githubPullRequestReader
+  );
   const wsServer = new WebSocketServer({
     path: "/graphql",
     server: httpServer
@@ -217,6 +207,7 @@ export async function startApiServer(
   const wsServerCleanup = useServer(
     {
       context: async (ctx): Promise<GraphQLContext> => ({
+        githubPullRequestReader,
         requestId: ctx.extra.request.headers["x-request-id"]?.toString() ?? "unknown",
         runStore
       }),
@@ -229,7 +220,8 @@ export async function startApiServer(
     appVersion,
     runStore,
     httpServer,
-    wsServerCleanup
+    wsServerCleanup,
+    githubPullRequestReader
   );
 
   await server.start();
@@ -240,6 +232,7 @@ export async function startApiServer(
     express.json(),
     expressMiddleware(server, {
       context: async ({ req }): Promise<GraphQLContext> => ({
+        githubPullRequestReader,
         requestId: req.headers["x-request-id"]?.toString() ?? "unknown",
         runStore
       })
@@ -266,10 +259,17 @@ export async function startStandaloneApiServer(appVersion: string): Promise<{
   url: string;
 }> {
   const runStore = new InMemoryRunStore();
-  const server = createGraphQLServer(appVersion, runStore);
+  const server = createGraphQLServer(
+    appVersion,
+    runStore,
+    undefined,
+    undefined,
+    null
+  );
 
   const started = await startStandaloneServer(server, {
     context: async ({ req }): Promise<GraphQLContext> => ({
+      githubPullRequestReader: null,
       requestId: req.headers["x-request-id"]?.toString() ?? "unknown",
       runStore
     }),

@@ -15,6 +15,7 @@ describe("health query", () => {
       },
       {
         contextValue: {
+          githubPullRequestReader: null,
           requestId: "test-request",
           runStore
         }

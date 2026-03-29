@@ -38,6 +38,7 @@ describe("workflow run flow", () => {
       },
       {
         contextValue: {
+          githubPullRequestReader: null,
           requestId: "test-request",
           runStore
         }
@@ -87,6 +88,7 @@ describe("workflow run flow", () => {
       },
       {
         contextValue: {
+          githubPullRequestReader: null,
           requestId: "test-request",
           runStore
         }
@@ -110,6 +112,7 @@ describe("workflow run flow", () => {
       },
       {
         contextValue: {
+          githubPullRequestReader: null,
           requestId: "test-request",
           runStore
         }
