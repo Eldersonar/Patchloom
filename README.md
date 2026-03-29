@@ -45,6 +45,7 @@ This project aims to automate first-pass analysis while keeping human approval f
 - Prompt/workflow version metadata and run artifacts (raw model responses + normalized output) stored in run state.
 - Suggestion approval and publish-governance store with idempotent publication records.
 - In-memory run store for development and test workflows.
+- Web dashboard for starting runs, viewing run list/details, and subscribing to live run updates.
 - Provider-agnostic AI interface with Gemini adapter and factory wiring.
 - DB connection check utility with tests.
 - Initial SQL migration and domain model documentation.
@@ -110,6 +111,12 @@ The architecture is being built for external agent integration (for example, Ope
 - structured GraphQL operations
 - deterministic run states
 - human approval gates before write actions
+
+## Web Dashboard (Current)
+- Start PR review runs from the browser.
+- View run list with status and repository context.
+- View structured run details (summary, risks, suggested tests, follow-up tasks).
+- Receive live status/detail updates through GraphQL `runUpdated` subscriptions.
 
 ## GraphQL Operations (Current)
 - Query `health`
