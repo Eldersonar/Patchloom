@@ -34,3 +34,6 @@ This file defines implementation standards for the AI Engineering Workflow Assis
 - Build read-only and low-risk workflows first.
 - Add write actions only with explicit approval and auditability.
 - Keep changes small, reviewable, and test-backed.
+- Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) for all commit messages.
+- Preferred prefixes: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `ci`.
+- Format: `<type>(optional-scope): <short summary>`.
