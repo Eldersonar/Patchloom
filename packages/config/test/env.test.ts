@@ -12,6 +12,7 @@ describe("loadEnvironment", () => {
     expect(result.MODEL_PROVIDER).toBe("gemini");
     expect(result.NODE_ENV).toBe("development");
     expect(result.PORT).toBe(4000);
+    expect(result.GEMINI_MODEL).toBe("gemini-2.5-flash");
   });
 
   it("throws for invalid required values", () => {

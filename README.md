@@ -28,6 +28,7 @@ This project aims to automate first-pass analysis while keeping human approval f
 - `apps/api` GraphQL API service
 - `apps/web` React web shell
 - `packages/config` env parsing and validation
+- `packages/ai` provider abstraction and adapters
 - `packages/core` shared workflow types
 - `packages/db` DB connection utilities
 - `packages/db/migrations` SQL migration files
@@ -40,6 +41,7 @@ This project aims to automate first-pass analysis while keeping human approval f
 - API GraphQL run flow with `startPullRequestReview`, `getRun`, and `listRuns`.
 - API GraphQL subscription with `runUpdated(runId: ID!)`.
 - In-memory run store for development and test workflows.
+- Provider-agnostic AI interface with Gemini adapter and factory wiring.
 - DB connection check utility with tests.
 - Initial SQL migration and domain model documentation.
 - Docker Compose setup for Postgres and Redis.
@@ -83,6 +85,8 @@ Required for current scaffold:
 - `NODE_ENV`
 - `PORT`
 - `MODEL_PROVIDER`
+- `GEMINI_MODEL`
+- `GEMINI_API_KEY`
 - `DATABASE_URL`
 - `REDIS_URL`
 
