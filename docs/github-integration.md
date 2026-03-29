@@ -21,7 +21,9 @@ Default API URL:
 1. Configure GitHub webhook to `POST /webhooks/github`.
 2. API validates `X-Hub-Signature-256` with `GITHUB_WEBHOOK_SECRET`.
 3. Duplicate deliveries (`X-GitHub-Delivery`) are ignored idempotently.
-4. Supported `pull_request` actions (`opened`, `reopened`, `synchronize`) start workflow runs.
+4. Payloads are normalized into an internal PR/issue event shape.
+5. Supported `pull_request` actions (`opened`, `reopened`, `synchronize`) start workflow runs.
+6. `issues` events are currently normalized and ignored in MVP.
 
 ## Notes
 - If `GITHUB_TOKEN` is missing, `startPullRequestReviewFromUrl` returns an explicit configuration error.

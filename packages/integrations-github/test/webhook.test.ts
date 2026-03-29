@@ -3,6 +3,8 @@ import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 
 import {
+  extractIssueWebhookDetails,
+  normalizeGitHubWebhookEvent,
   extractPullRequestWebhookDetails,
   verifyGitHubWebhookSignature
 } from "../src/webhook";
@@ -58,5 +60,84 @@ describe("extractPullRequestWebhookDetails", () => {
         action: "closed"
       })
     ).toBeNull();
+  });
+});
+
+describe("extractIssueWebhookDetails", () => {
+  it("returns details for supported issue actions", () => {
+    const details = extractIssueWebhookDetails("issues", {
+      action: "opened",
+      issue: {
+        body: "Users are logged out after profile update.",
+        number: 21,
+        title: "Users randomly logged out"
+      },
+      repository: {
+        full_name: "acme/payments"
+      }
+    });
+
+    expect(details).toEqual({
+      issueBody: "Users are logged out after profile update.",
+      issueNumber: 21,
+      issueTitle: "Users randomly logged out",
+      repository: "acme/payments"
+    });
+  });
+
+  it("returns null for unsupported issue actions", () => {
+    expect(
+      extractIssueWebhookDetails("issues", {
+        action: "closed"
+      })
+    ).toBeNull();
+  });
+});
+
+describe("normalizeGitHubWebhookEvent", () => {
+  it("normalizes pull request payloads", () => {
+    const normalized = normalizeGitHubWebhookEvent("pull_request", {
+      action: "opened",
+      pull_request: {
+        number: 22,
+        title: "Add billing guardrails"
+      },
+      repository: {
+        full_name: "acme/payments"
+      }
+    });
+
+    expect(normalized).toEqual({
+      details: {
+        pullRequestNumber: 22,
+        pullRequestTitle: "Add billing guardrails",
+        repository: "acme/payments"
+      },
+      kind: "pull_request"
+    });
+  });
+
+  it("normalizes issue payloads", () => {
+    const normalized = normalizeGitHubWebhookEvent("issues", {
+      action: "opened",
+      issue: {
+        body: "Billing edge case after deploy.",
+        number: 44,
+        title: "Billing edge case"
+      },
+      repository: {
+        full_name: "acme/payments"
+      }
+    });
+
+    expect(normalized).toEqual({
+      details: {
+        issueBody: "Billing edge case after deploy.",
+        issueNumber: 44,
+        issueTitle: "Billing edge case",
+        repository: "acme/payments"
+      },
+      kind: "issue"
+    });
   });
 });

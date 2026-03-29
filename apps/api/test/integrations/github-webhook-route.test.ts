@@ -109,6 +109,35 @@ describe("github webhook route", () => {
     expect(secondBody.status).toBe("duplicate_ignored");
     expect(runningServer.runStore.listRuns()).toHaveLength(1);
   });
+
+  it("ignores non pull_request events after verification", async () => {
+    const runningServer = await startWebhookServer({
+      webhookSecret: "test-secret"
+    });
+    const payload = JSON.stringify({
+      action: "opened",
+      issue: {
+        body: "Users see stale cache data.",
+        number: 88,
+        title: "Stale cache data"
+      },
+      repository: {
+        full_name: "acme/platform"
+      }
+    });
+
+    const response = await postWebhook(runningServer.url, {
+      body: payload,
+      deliveryId: "delivery-4",
+      eventName: "issues",
+      secret: "test-secret"
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(202);
+    expect(body.status).toBe("ignored");
+    expect(runningServer.runStore.listRuns()).toHaveLength(0);
+  });
 });
 
 async function startWebhookServer(options: {

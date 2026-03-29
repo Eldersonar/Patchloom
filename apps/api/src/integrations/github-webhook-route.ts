@@ -1,8 +1,9 @@
 import type { Express } from "express";
 import express from "express";
 import {
-  extractPullRequestWebhookDetails,
+  type GitHubIssueWebhookPayload,
   type GitHubPullRequestWebhookPayload,
+  normalizeGitHubWebhookEvent,
   verifyGitHubWebhookSignature
 } from "@patchloom/integrations-github";
 
@@ -81,17 +82,19 @@ export function registerGitHubWebhookRoute(
         return;
       }
 
-      const details = extractPullRequestWebhookDetails(
+      const normalizedEvent = normalizeGitHubWebhookEvent(
         eventName,
-        payload as GitHubPullRequestWebhookPayload
+        payload as GitHubPullRequestWebhookPayload | GitHubIssueWebhookPayload
       );
 
-      if (!details) {
+      if (!normalizedEvent || normalizedEvent.kind !== "pull_request") {
         response.status(202).json({ status: "ignored" });
         return;
       }
 
-      const run = options.runStore.startPullRequestReview(details);
+      const run = options.runStore.startPullRequestReview(
+        normalizedEvent.details
+      );
 
       response.status(202).json({
         runId: run.id,
