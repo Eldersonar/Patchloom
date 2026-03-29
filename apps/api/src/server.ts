@@ -1,6 +1,10 @@
 import { ApolloServer } from "@apollo/server";
 import { startStandaloneServer } from "@apollo/server/standalone";
 
+import type { StartPullRequestReviewInput, WorkflowRun } from "@patchloom/core";
+
+import { InMemoryRunStore } from "./workflow/run-store";
+
 export interface HealthResponse {
   status: string;
   version: string;
@@ -8,6 +12,7 @@ export interface HealthResponse {
 
 export interface GraphQLContext {
   requestId: string;
+  runStore: InMemoryRunStore;
 }
 
 const typeDefs = `#graphql
@@ -16,8 +21,39 @@ const typeDefs = `#graphql
     version: String!
   }
 
+  type Suggestion {
+    content: String!
+    createdAt: String!
+    id: ID!
+    kind: String!
+  }
+
+  type WorkflowRun {
+    createdAt: String!
+    id: ID!
+    pullRequestNumber: Int!
+    repository: String!
+    status: String!
+    suggestions: [Suggestion!]!
+    summary: String!
+    updatedAt: String!
+    workflowType: String!
+  }
+
+  input StartPullRequestReviewInput {
+    pullRequestNumber: Int!
+    pullRequestTitle: String!
+    repository: String!
+  }
+
   type Query {
+    getRun(id: ID!): WorkflowRun
     health: Health!
+    listRuns: [WorkflowRun!]!
+  }
+
+  type Mutation {
+    startPullRequestReview(input: StartPullRequestReviewInput!): WorkflowRun!
   }
 `;
 
@@ -25,16 +61,35 @@ const typeDefs = `#graphql
  * Creates a configured GraphQL Apollo server instance.
  *
  * @param appVersion - Service version string returned by health query.
+ * @param runStore - Run store implementation used by workflow resolvers.
  * @returns Apollo server instance.
  */
-export function createGraphQLServer(appVersion: string): ApolloServer<GraphQLContext> {
+export function createGraphQLServer(
+  appVersion: string,
+  runStore: InMemoryRunStore = new InMemoryRunStore()
+): ApolloServer<GraphQLContext> {
   return new ApolloServer<GraphQLContext>({
     resolvers: {
+      Mutation: {
+        startPullRequestReview: (
+          _: unknown,
+          args: { input: StartPullRequestReviewInput },
+          context: GraphQLContext
+        ): WorkflowRun =>
+          (context.runStore ?? runStore).startPullRequestReview(args.input)
+      },
       Query: {
+        getRun: (
+          _: unknown,
+          args: { id: string },
+          context: GraphQLContext
+        ): WorkflowRun | null => (context.runStore ?? runStore).getRun(args.id),
         health: (): HealthResponse => ({
           status: "ok",
           version: appVersion
-        })
+        }),
+        listRuns: (_: unknown, __: unknown, context: GraphQLContext): WorkflowRun[] =>
+          (context.runStore ?? runStore).listRuns()
       }
     },
     typeDefs
@@ -52,11 +107,13 @@ export async function startApiServer(
   port: number,
   appVersion: string
 ): Promise<{ url: string }> {
-  const server = createGraphQLServer(appVersion);
+  const runStore = new InMemoryRunStore();
+  const server = createGraphQLServer(appVersion, runStore);
 
   const started = await startStandaloneServer(server, {
     context: async ({ req }): Promise<GraphQLContext> => ({
-      requestId: req.headers["x-request-id"]?.toString() ?? "unknown"
+      requestId: req.headers["x-request-id"]?.toString() ?? "unknown",
+      runStore
     }),
     listen: {
       port

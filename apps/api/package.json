@@ -12,6 +12,7 @@
   "dependencies": {
     "@apollo/server": "^5.0.0",
     "@patchloom/config": "workspace:*",
+    "@patchloom/core": "workspace:*",
     "graphql": "^16.11.0"
   }
 }

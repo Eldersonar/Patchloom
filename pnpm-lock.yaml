@@ -59,6 +59,9 @@ importers:
       '@patchloom/config':
         specifier: workspace:*
         version: link:../../packages/config
+      '@patchloom/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       graphql:
         specifier: ^16.11.0
         version: 16.13.2
@@ -81,6 +84,8 @@ importers:
       zod:
         specifier: ^4.1.5
         version: 4.3.6
+
+  packages/core: {}
 
   packages/db:
     dependencies:

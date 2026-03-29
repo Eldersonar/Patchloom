@@ -4,8 +4,8 @@ Open-source, self-hostable assistant for engineering workflows. It provides a Gr
 
 ## Current Status
 - Phase 0 foundation is implemented.
-- Monorepo scaffold, API skeleton, config/db packages, Docker dependencies, and CI checks are in place.
-- MVP implementation (workflow logic and GitHub integration) is next.
+- Phase 1 core API skeleton is in progress.
+- Current API includes run operations: `startPullRequestReview`, `getRun`, and `listRuns`.
 
 ## Why This Project Exists
 Engineering teams spend too much time on repetitive coordination around code changes:
@@ -28,14 +28,19 @@ This project aims to automate first-pass analysis while keeping human approval f
 - `apps/api` GraphQL API service
 - `apps/web` React web shell
 - `packages/config` env parsing and validation
+- `packages/core` shared workflow types
 - `packages/db` DB connection utilities
+- `packages/db/migrations` SQL migration files
 - `.github/workflows/ci.yml` lint/typecheck/test workflow
 
 ## Implemented Foundations
 - Workspace and package scaffolding with `pnpm`.
 - Typed env validation (`zod`) with tests.
 - API GraphQL skeleton with `health` query and tests.
+- API GraphQL run flow with `startPullRequestReview`, `getRun`, and `listRuns`.
+- In-memory run store for development and test workflows.
 - DB connection check utility with tests.
+- Initial SQL migration and domain model documentation.
 - Docker Compose setup for Postgres and Redis.
 - CI pipeline for lint, typecheck, and tests.
 
@@ -93,6 +98,12 @@ The architecture is being built for external agent integration (for example, Ope
 - structured GraphQL operations
 - deterministic run states
 - human approval gates before write actions
+
+## GraphQL Operations (Current)
+- Query `health`
+- Query `getRun(id: ID!)`
+- Query `listRuns`
+- Mutation `startPullRequestReview(input: StartPullRequestReviewInput!)`
 
 ## Roadmap (Near-Term)
 1. Run model + persistence schema (`WorkflowRun`, `Suggestion`, approvals)
