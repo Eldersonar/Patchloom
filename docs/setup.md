@@ -26,7 +26,7 @@ sed -i 's/^DEMO_MODE=.*/DEMO_MODE=true/' .env
 ```
 4. Start dependencies:
 ```bash
-docker compose up -d
+docker compose up --build
 ```
 5. Run quality checks:
 ```bash
@@ -37,6 +37,14 @@ pnpm test
 6. Start services:
 ```bash
 pnpm dev
+```
+
+Notes:
+- `docker compose up --build` now starts `postgres`, `redis`, `api`, and `web`.
+- If you run with Docker, you can skip step 6.
+- To run only dependencies, use:
+```bash
+docker compose up postgres redis
 ```
 
 ## Verification Checklist

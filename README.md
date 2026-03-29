@@ -80,7 +80,7 @@ sed -i 's/^DEMO_MODE=.*/DEMO_MODE=true/' .env
 ```
 4. Start local dependencies:
 ```bash
-docker compose up -d
+docker compose up --build
 ```
 5. Validate quality gates:
 ```bash
@@ -92,6 +92,13 @@ pnpm test:integration
 6. Run services:
 ```bash
 pnpm dev
+```
+
+If you use Docker for all services, you can skip step 6.
+
+Run only infra dependencies when needed:
+```bash
+docker compose up postgres redis
 ```
 
 ## Test Real Flow (No Mock Data)
