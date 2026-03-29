@@ -6,7 +6,9 @@ import { InMemoryReviewGovernanceStore } from "../../src/workflow/review-governa
 describe("InMemoryReviewGovernanceStore", () => {
   it("stores approval decisions per suggestion", async () => {
     const runStore = createRunStoreWithDeterministicSuggestions();
-    const governanceStore = new InMemoryReviewGovernanceStore();
+    const governanceStore = new InMemoryReviewGovernanceStore({
+      commentPublisher: createCommentPublisherStub()
+    });
     const run = await createCompletedRun(runStore);
     const suggestionId = run.suggestions[0]?.id;
 
@@ -30,7 +32,9 @@ describe("InMemoryReviewGovernanceStore", () => {
 
   it("blocks publishing until all suggestions are approved", async () => {
     const runStore = createRunStoreWithDeterministicSuggestions();
-    const governanceStore = new InMemoryReviewGovernanceStore();
+    const governanceStore = new InMemoryReviewGovernanceStore({
+      commentPublisher: createCommentPublisherStub()
+    });
     const run = await createCompletedRun(runStore);
     const firstSuggestionId = run.suggestions[0]?.id;
 
@@ -45,19 +49,56 @@ describe("InMemoryReviewGovernanceStore", () => {
       suggestionId: firstSuggestionId
     });
 
-    expect(() =>
+    await expect(
       governanceStore.publishComment(runStore, {
         body: "Summary comment",
         idempotencyKey: "publish-1",
         runId: run.id,
         target: "https://github.com/acme/payments/pull/302"
       })
-    ).toThrowError(/Missing approvals/);
+    ).rejects.toThrowError(/Missing approvals/);
 
     runStore.dispose();
   });
 
-  it("publishes idempotently when all approvals exist", async () => {
+  it("publishes to GitHub and remains idempotent for duplicate keys", async () => {
+    const runStore = createRunStoreWithDeterministicSuggestions();
+    const governanceStore = new InMemoryReviewGovernanceStore({
+      commentPublisher: createCommentPublisherStub()
+    });
+    const run = await createCompletedRun(runStore);
+
+    for (const suggestion of run.suggestions) {
+      governanceStore.approveSuggestion(runStore, {
+        actor: "simon",
+        decision: "approved",
+        runId: run.id,
+        suggestionId: suggestion.id
+      });
+    }
+
+    const firstPublication = await governanceStore.publishComment(runStore, {
+      body: "Approved summary",
+      idempotencyKey: "publish-2",
+      runId: run.id,
+      target: "https://github.com/acme/payments/pull/302"
+    });
+    const duplicatePublication = await governanceStore.publishComment(runStore, {
+      body: "Approved summary",
+      idempotencyKey: "publish-2",
+      runId: run.id,
+      target: "https://github.com/acme/payments/pull/302"
+    });
+
+    expect(duplicatePublication.id).toBe(firstPublication.id);
+    expect(firstPublication.commentId).toBe("123");
+    expect(firstPublication.publishedUrl).toContain("issuecomment-123");
+    expect(governanceStore.listCommentPublications(run.id)).toHaveLength(1);
+
+    runStore.dispose();
+  });
+
+  it("fails publishing when GitHub publisher is not configured", async () => {
     const runStore = createRunStoreWithDeterministicSuggestions();
     const governanceStore = new InMemoryReviewGovernanceStore();
     const run = await createCompletedRun(runStore);
@@ -71,21 +112,14 @@ describe("InMemoryReviewGovernanceStore", () => {
       });
     }
 
-    const firstPublication = governanceStore.publishComment(runStore, {
-      body: "Approved summary",
-      idempotencyKey: "publish-2",
-      runId: run.id,
-      target: "https://github.com/acme/payments/pull/302"
-    });
-    const duplicatePublication = governanceStore.publishComment(runStore, {
-      body: "Approved summary",
-      idempotencyKey: "publish-2",
-      runId: run.id,
-      target: "https://github.com/acme/payments/pull/302"
-    });
-
-    expect(duplicatePublication.id).toBe(firstPublication.id);
-    expect(governanceStore.listCommentPublications(run.id)).toHaveLength(1);
+    await expect(
+      governanceStore.publishComment(runStore, {
+        body: "Approved summary",
+        idempotencyKey: "publish-3",
+        runId: run.id,
+        target: "https://github.com/acme/payments/pull/302"
+      })
+    ).rejects.toThrowError(/GitHub comment publisher is not configured/);
 
     runStore.dispose();
   });
@@ -150,4 +184,15 @@ async function createCompletedRun(runStore: InMemoryRunStore) {
   }
 
   throw new Error("Run did not complete in expected time");
+}
+
+function createCommentPublisherStub() {
+  return {
+    async publishPullRequestComment() {
+      return {
+        commentId: "123",
+        publishedUrl: "https://github.com/acme/payments/pull/302#issuecomment-123"
+      };
+    }
+  };
 }

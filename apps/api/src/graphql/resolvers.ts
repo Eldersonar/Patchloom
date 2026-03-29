@@ -53,11 +53,11 @@ export function createResolvers(dependencies: ResolverDependencies) {
           context.runStore ?? runStore,
           args.input
         ),
-      publishComment: (
+      publishComment: async (
         _: unknown,
         args: { input: PublishCommentInput },
         context: GraphQLContext
-      ): CommentPublication =>
+      ): Promise<CommentPublication> =>
         (context.reviewGovernanceStore ?? reviewGovernanceStore).publishComment(
           context.runStore ?? runStore,
           args.input

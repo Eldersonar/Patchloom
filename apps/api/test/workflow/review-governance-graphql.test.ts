@@ -7,7 +7,16 @@ import { InMemoryReviewGovernanceStore } from "../../src/workflow/review-governa
 describe("review governance GraphQL", () => {
   it("approves suggestions and publishes with idempotency", async () => {
     const runStore = createRunStoreWithDeterministicSuggestions();
-    const reviewGovernanceStore = new InMemoryReviewGovernanceStore();
+    const reviewGovernanceStore = new InMemoryReviewGovernanceStore({
+      commentPublisher: {
+        async publishPullRequestComment() {
+          return {
+            commentId: "456",
+            publishedUrl: "https://github.com/acme/payments/pull/302#issuecomment-456"
+          };
+        }
+      }
+    });
     const server = createGraphQLServer(
       "0.1.0-test",
       runStore,
@@ -139,6 +148,8 @@ describe("review governance GraphQL", () => {
             publishComment(input: $input) {
               id
               idempotencyKey
+              commentId
+              publishedUrl
             }
           }
         `,
@@ -168,6 +179,8 @@ describe("review governance GraphQL", () => {
             publishComment(input: $input) {
               id
               idempotencyKey
+              commentId
+              publishedUrl
             }
           }
         `,
@@ -201,16 +214,32 @@ describe("review governance GraphQL", () => {
     }
 
     const firstPublishData = publishResult.body.singleResult.data as
-      | { publishComment: { id: string } }
+      | {
+          publishComment: {
+            commentId: string;
+            id: string;
+            publishedUrl: string;
+          };
+        }
       | undefined;
     const duplicatePublishData = duplicatePublishResult.body.singleResult.data as
-      | { publishComment: { id: string } }
+      | {
+          publishComment: {
+            commentId: string;
+            id: string;
+            publishedUrl: string;
+          };
+        }
       | undefined;
     const firstPublishId = firstPublishData?.publishComment.id;
     const duplicatePublishId = duplicatePublishData?.publishComment.id;
 
     expect(firstPublishId).toBeDefined();
     expect(duplicatePublishId).toBe(firstPublishId);
+    expect(firstPublishData?.publishComment.commentId).toBe("456");
+    expect(firstPublishData?.publishComment.publishedUrl).toContain(
+      "issuecomment-456"
+    );
   });
 });
 

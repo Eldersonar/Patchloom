@@ -76,6 +76,10 @@ body {
   margin-top: 0.75rem;
 }
 
+.actions--inline {
+  margin-top: 0.5rem;
+}
+
 button {
   border: 0;
   border-radius: 10px;
@@ -128,6 +132,18 @@ button:disabled {
 .panel--detail ul {
   margin-top: 0.35rem;
   padding-left: 1rem;
+}
+
+.suggestion-item {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 0.6rem;
+  padding: 0.7rem;
+}
+
+.approval-status {
+  color: var(--muted);
+  margin: 0;
 }
 
 @media (max-width: 900px) {

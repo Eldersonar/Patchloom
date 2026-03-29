@@ -14,6 +14,7 @@ import { WebSocketServer } from "ws";
 import { createResolvers, type GraphQLContext } from "./graphql/resolvers";
 import { typeDefs } from "./graphql/type-defs";
 import {
+  createGitHubCommentPublisher,
   createGitHubPullRequestReader,
   type CreateGitHubPullRequestReaderOptions,
   type GitHubPullRequestReader
@@ -116,7 +117,10 @@ export async function startApiServer(
   githubOptions: CreateGitHubPullRequestReaderOptions = {}
 ): Promise<{ subscriptionUrl: string; url: string }> {
   const runStore = new InMemoryRunStore();
-  const reviewGovernanceStore = new InMemoryReviewGovernanceStore();
+  const githubCommentPublisher = createGitHubCommentPublisher(githubOptions);
+  const reviewGovernanceStore = new InMemoryReviewGovernanceStore({
+    commentPublisher: githubCommentPublisher
+  });
   const githubPullRequestReader = createGitHubPullRequestReader(githubOptions);
   const app = express();
   const httpServer = createServer(app);
