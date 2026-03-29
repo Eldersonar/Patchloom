@@ -5,13 +5,18 @@ import type {
 } from "../model-provider";
 import {
   LIST_OUTPUT_SCHEMA,
+  ModelCallTimeoutError,
   buildFollowUpPrompt,
   buildRisksPrompt,
   buildSuggestedTestsPrompt,
   buildSummaryPrompt,
   invokeWithRetries,
-  normalizeConfidence
+  normalizeConfidence,
+  type RetryPolicy
 } from "./pr-review-workflow-helpers";
+
+export { ModelCallTimeoutError };
+export type { RetryPolicy };
 
 export interface PullRequestReviewWorkflowInput {
   pullRequestNumber: number;
@@ -22,6 +27,8 @@ export interface PullRequestReviewWorkflowInput {
 export interface PullRequestReviewOutput {
   confidence: number;
   followUpTasks: string[];
+  model?: string;
+  provider?: string;
   promptVersion: string;
   risks: string[];
   suggestedTests: string[];
@@ -49,6 +56,7 @@ export interface PullRequestReviewWorkflowOptions {
   maxRetries?: number;
   promptVersion?: string;
   provider: ModelProvider;
+  retryPolicy?: Partial<RetryPolicy>;
   temperature?: number;
   workflowVersion?: string;
 }
@@ -194,26 +202,29 @@ export async function runPullRequestReviewWorkflow(
 ): Promise<PullRequestReviewWorkflowResult> {
   const promptVersion = options.promptVersion ?? "pr-review-prompts/v1";
   const workflowVersion = options.workflowVersion ?? "pr-review-workflow/v1";
-  const maxRetries = options.maxRetries ?? 1;
+  const retryPolicy = {
+    ...(options.retryPolicy ?? {}),
+    maxRetries: options.maxRetries ?? options.retryPolicy?.maxRetries ?? 1
+  };
 
   const summaryNode = await invokeWithRetries(
     () =>
       generateSummaryNode(options.provider, options.input, options.temperature),
-    maxRetries
+    retryPolicy
   );
   const risksNode = await invokeWithRetries(
     () => generateRisksNode(options.provider, options.input, options.temperature),
-    maxRetries
+    retryPolicy
   );
   const testsNode = await invokeWithRetries(
     () =>
       generateSuggestedTestsNode(options.provider, options.input, options.temperature),
-    maxRetries
+    retryPolicy
   );
   const followUpNode = await invokeWithRetries(
     () =>
       generateFollowUpTasksNode(options.provider, options.input, options.temperature),
-    maxRetries
+    retryPolicy
   );
 
   const normalizedOutput = {
@@ -241,6 +252,8 @@ export async function runPullRequestReviewWorkflow(
     },
     output: {
       ...normalizedOutput,
+      model: summaryNode.raw.model,
+      provider: summaryNode.raw.provider,
       promptVersion,
       workflowVersion
     }

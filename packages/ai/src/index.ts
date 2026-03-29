@@ -8,6 +8,7 @@ export {
 } from "./model-provider";
 export { GeminiProvider, type GeminiProviderOptions } from "./providers/gemini-provider";
 export {
+  ModelCallTimeoutError,
   calculateConfidence,
   generateFollowUpTasksNode,
   generateRisksNode,
@@ -18,5 +19,6 @@ export {
   type PullRequestReviewOutput,
   type PullRequestReviewWorkflowInput,
   type PullRequestReviewWorkflowOptions,
-  type PullRequestReviewWorkflowResult
+  type PullRequestReviewWorkflowResult,
+  type RetryPolicy
 } from "./workflows/pr-review-workflow";

@@ -8,6 +8,7 @@ import type {
   TextGenerationResult
 } from "../src/model-provider";
 import {
+  ModelCallTimeoutError,
   calculateConfidence,
   generateRisksNode,
   generateSummaryNode,
@@ -134,6 +135,68 @@ describe("pr-review-workflow", () => {
         provider
       })
     ).rejects.toThrowError(/temporary model error/);
+  });
+
+  it("fails fast for non-retryable model errors", async () => {
+    let structuredCalls = 0;
+    const provider: ModelProvider = {
+      async generateText() {
+        return {
+          model: "stub-model",
+          provider: "stub",
+          text: "Summary output"
+        };
+      },
+      async generateStructured() {
+        structuredCalls += 1;
+        throw new Error("schema validation failed");
+      }
+    };
+
+    await expect(
+      runPullRequestReviewWorkflow({
+        input: BASE_INPUT,
+        maxRetries: 3,
+        provider
+      })
+    ).rejects.toThrowError(/schema validation failed/);
+
+    expect(structuredCalls).toBe(1);
+  });
+
+  it("marks model call timeouts as terminal workflow failures", async () => {
+    const provider: ModelProvider = {
+      async generateText() {
+        await new Promise((resolve) => {
+          setTimeout(resolve, 25);
+        });
+
+        return {
+          model: "stub-model",
+          provider: "stub",
+          text: "Summary output"
+        };
+      },
+      async generateStructured(request) {
+        const parsed = request.schema.parse({ items: ["fallback item"] });
+        return {
+          data: parsed,
+          model: "stub-model",
+          provider: "stub",
+          text: JSON.stringify(parsed)
+        };
+      }
+    };
+
+    await expect(
+      runPullRequestReviewWorkflow({
+        input: BASE_INPUT,
+        provider,
+        retryPolicy: {
+          timeoutMs: 5
+        }
+      })
+    ).rejects.toBeInstanceOf(ModelCallTimeoutError);
   });
 
   it("tests summary and risk node functions directly", async () => {
