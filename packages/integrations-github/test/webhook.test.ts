@@ -26,6 +26,15 @@ describe("verifyGitHubWebhookSignature", () => {
       verifyGitHubWebhookSignature(rawBody, "sha256=1234", "test-secret")
     ).toBe(false);
   });
+
+  it("returns false for malformed hex signatures", () => {
+    const rawBody = Buffer.from('{"action":"opened"}', "utf8");
+    const malformedSignature = `sha256=${"z".repeat(64)}`;
+
+    expect(
+      verifyGitHubWebhookSignature(rawBody, malformedSignature, "test-secret")
+    ).toBe(false);
+  });
 });
 
 describe("extractPullRequestWebhookDetails", () => {

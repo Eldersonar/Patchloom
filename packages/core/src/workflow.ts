@@ -59,6 +59,8 @@ export interface WorkflowRun {
 }
 
 export interface StartPullRequestReviewInput {
+  changedFiles?: string[];
+  pullRequestBody?: string;
   pullRequestNumber: number;
   pullRequestTitle: string;
   repository: string;

@@ -62,11 +62,35 @@ export function createResolvers(dependencies: ResolverDependencies) {
           context.runStore ?? runStore,
           args.input
         ),
-      startPullRequestReview: (
+      startPullRequestReview: async (
         _: unknown,
         args: { input: StartPullRequestReviewInput },
         context: GraphQLContext
-      ): WorkflowRun => (context.runStore ?? runStore).startPullRequestReview(args.input),
+      ): Promise<WorkflowRun> => {
+        const reader = context.githubPullRequestReader ?? githubPullRequestReader;
+
+        if (!reader) {
+          throw new Error(
+            "GitHub token integration is not configured. Set GITHUB_TOKEN."
+          );
+        }
+
+        const parsedRepository = parseRepositoryInput(args.input.repository);
+
+        if (!parsedRepository) {
+          throw new Error(
+            "Repository must be owner/repo or a GitHub pull request URL."
+          );
+        }
+
+        const details = await reader.fetchPullRequest(
+          parsedRepository.owner,
+          parsedRepository.repository,
+          parsedRepository.pullRequestNumber ?? args.input.pullRequestNumber
+        );
+
+        return (context.runStore ?? runStore).startPullRequestReview(details);
+      },
       startPullRequestReviewFromUrl: async (
         _: unknown,
         args: { input: { pullRequestUrl: string } },
@@ -82,11 +106,7 @@ export function createResolvers(dependencies: ResolverDependencies) {
 
         const details = await reader.fetchPullRequestByUrl(args.input.pullRequestUrl);
 
-        return (context.runStore ?? runStore).startPullRequestReview({
-          pullRequestNumber: details.pullRequestNumber,
-          pullRequestTitle: details.pullRequestTitle,
-          repository: details.repository
-        });
+        return (context.runStore ?? runStore).startPullRequestReview(details);
       }
     },
     Query: {
@@ -145,4 +165,59 @@ export function createResolvers(dependencies: ResolverDependencies) {
       }
     }
   };
+}
+
+function parseRepositoryInput(
+  value: string
+): { owner: string; repository: string; pullRequestNumber?: number } | null {
+  const trimmed = value.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const slashSegments = trimmed.split("/");
+
+  if (slashSegments.length === 2) {
+    const [owner, repository] = slashSegments.map((part) => part.trim());
+
+    if (!owner || !repository) {
+      return null;
+    }
+
+    return {
+      owner,
+      repository
+    };
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    const segments = parsed.pathname.split("/").filter(Boolean);
+
+    if (segments.length < 2 || segments[0] === "" || segments[1] === "") {
+      return null;
+    }
+
+    const details: {
+      owner: string;
+      pullRequestNumber?: number;
+      repository: string;
+    } = {
+      owner: segments[0],
+      repository: segments[1]
+    };
+
+    if (segments.length >= 4 && segments[2] === "pull") {
+      const pullRequestNumber = Number.parseInt(segments[3], 10);
+
+      if (Number.isInteger(pullRequestNumber) && pullRequestNumber > 0) {
+        details.pullRequestNumber = pullRequestNumber;
+      }
+    }
+
+    return details;
+  } catch {
+    return null;
+  }
 }

@@ -1,12 +1,13 @@
 # AI Engineering Workflow Assistant
 
-Open-source, self-hostable assistant for engineering workflows. It provides a GraphQL control plane plus LangGraph-ready workflow orchestration for PR/issue triage, risk/test suggestions, and approval-gated publishing.
+Open-source, self-hostable assistant for engineering workflows. It provides a GraphQL control plane plus workflow orchestration for PR/issue triage, risk/test suggestions, and approval-gated publishing.
 
-## Current Status
-- Phase 0 foundation is implemented.
-- Phase 1 core API skeleton is implemented.
-- Current API includes run lifecycle transitions, `runUpdated` subscription events, structured PR workflow outputs, and approval-gated GitHub publishing.
-- Demo mode is available for local runs without GitHub credentials.
+## Current Capabilities
+- GraphQL run lifecycle APIs with real-time `runUpdated` subscriptions.
+- Structured PR review outputs (summary, risks, suggested tests, follow-up tasks).
+- Human approval flow before publishing comments.
+- GitHub token-mode manual trigger + webhook ingestion with real PR fetch.
+- Demo mode (`DEMO_MODE=true`) for local onboarding without GitHub credentials.
 
 ## Why This Project Exists
 Engineering teams spend too much time on repetitive coordination around code changes:
@@ -71,7 +72,9 @@ pnpm install
 ```bash
 cp .env.example .env
 ```
-3. Optional: enable demo mode for local sample runs:
+3. Configure `.env`:
+   - Real mode (recommended): set `GEMINI_API_KEY`, `GITHUB_TOKEN`, and `GITHUB_WEBHOOK_SECRET`.
+   - Demo mode (optional): set `DEMO_MODE=true`.
 ```bash
 sed -i 's/^DEMO_MODE=.*/DEMO_MODE=true/' .env
 ```
@@ -88,9 +91,63 @@ pnpm test:integration
 ```
 6. Run services:
 ```bash
-pnpm --filter @patchloom/api dev
-pnpm --filter @patchloom/web dev
+pnpm dev
 ```
+
+## Test Real Flow (No Mock Data)
+1. Set `DEMO_MODE=false`, `GEMINI_API_KEY`, and `GITHUB_TOKEN` in `.env`.
+2. Run `pnpm dev`.
+3. Open `http://localhost:5173`.
+4. In the form, enter `owner/repo` (or GitHub PR URL) plus PR number.
+5. Start run and confirm the run fails for invalid PR numbers and succeeds for real PRs.
+
+## GitHub Webhook Setup
+Patchloom expects GitHub webhooks at:
+- `https://<your-domain>/webhooks/github`
+
+For local testing, use a tunnel and set:
+- `https://<your-tunnel-domain>/webhooks/github`
+
+### Ngrok (Local)
+1. Copy the provided template:
+```bash
+cp ngrok.example.yml ngrok.yml
+```
+2. Set ngrok flags in `.env`:
+```bash
+NGROK_ENABLED=true
+NGROK_AUTHTOKEN=<your-token>
+```
+3. Start your local API:
+```bash
+pnpm --filter @patchloom/api dev
+```
+4. Start ngrok with env-aware helper:
+```bash
+pnpm ngrok:start
+```
+5. Use the generated HTTPS URL in GitHub as:
+- `https://<your-ngrok-domain>/webhooks/github`
+
+Example secret generation:
+```bash
+openssl rand -hex 32
+```
+
+Then set it in `.env`:
+```bash
+GITHUB_WEBHOOK_SECRET=<paste-generated-secret>
+```
+
+In GitHub repository settings:
+1. Go to `Settings` -> `Webhooks` -> `Add webhook`.
+2. Set **Payload URL** to your `/webhooks/github` endpoint.
+3. Set **Content type** to `application/json`.
+4. Paste the same secret value into **Secret**.
+5. Select events:
+   - `Pull requests`
+   - `Issues`
+6. Keep SSL verification enabled.
 
 ## Environment Variables
 See `.env.example`.
@@ -100,11 +157,13 @@ Required for current scaffold:
 - `NODE_ENV`
 - `PORT`
 - `DEMO_MODE` (enable local seeded runs without GitHub credentials)
+- `NGROK_ENABLED` (enable/disable ngrok helper script)
+- `NGROK_AUTHTOKEN` (required when `NGROK_ENABLED=true`)
 - `MODEL_PROVIDER`
 - `GEMINI_MODEL`
-- `GEMINI_API_KEY`
+- `GEMINI_API_KEY` (required when `DEMO_MODE=false` and `MODEL_PROVIDER=gemini`)
 - `GITHUB_API_URL`
-- `GITHUB_TOKEN` (required for `startPullRequestReviewFromUrl` and private repos)
+- `GITHUB_TOKEN` (required for real-data PR lookup and publish actions)
 - `GITHUB_WEBHOOK_SECRET` (required for `/webhooks/github` signature verification)
 - `DATABASE_URL`
 - `REDIS_URL`
@@ -144,6 +203,8 @@ The architecture is being built for external agent integration (for example, Ope
 - Query `listCommentPublications(runId: ID!)`
 - Subscription `runUpdated(runId: ID!)`
 - `WorkflowRun` now includes `confidence`, `risks`, `suggestedTests`, `followUpTasks`, `promptVersion`, and `workflowVersion`.
+
+`startPullRequestReview` now performs a GitHub lookup from `repository` + `pullRequestNumber`. Non-existent PRs return a GitHub read error instead of producing deterministic mock output.
 
 ## Documentation
 - Setup: [`docs/setup.md`](/home/simon/Documents/personal/Patchloom/docs/setup.md)

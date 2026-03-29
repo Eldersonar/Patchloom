@@ -14,6 +14,8 @@ import {
 } from "./pr-review-workflow-helpers";
 
 export interface PullRequestReviewWorkflowInput {
+  changedFiles?: string[];
+  pullRequestBody?: string;
   pullRequestNumber: number;
   pullRequestTitle: string;
   repository: string;

@@ -11,8 +11,11 @@ export function buildSummaryPrompt(input: PullRequestReviewWorkflowInput): strin
     "You are reviewing a software pull request.",
     `Repository: ${input.repository}`,
     `Pull request: #${input.pullRequestNumber} ${input.pullRequestTitle}`,
+    buildAdditionalContext(input),
     "Return a concise summary in 2-3 sentences."
-  ].join("\n");
+  ]
+    .filter((part) => part.length > 0)
+    .join("\n");
 }
 
 export function buildRisksPrompt(input: PullRequestReviewWorkflowInput): string {
@@ -20,8 +23,11 @@ export function buildRisksPrompt(input: PullRequestReviewWorkflowInput): string 
     "You are reviewing pull request risk areas.",
     `Repository: ${input.repository}`,
     `Pull request: #${input.pullRequestNumber} ${input.pullRequestTitle}`,
+    buildAdditionalContext(input),
     "Return JSON with key `items` as a list of 3-5 concrete risk areas."
-  ].join("\n");
+  ]
+    .filter((part) => part.length > 0)
+    .join("\n");
 }
 
 export function buildSuggestedTestsPrompt(
@@ -31,8 +37,11 @@ export function buildSuggestedTestsPrompt(
     "You are generating software test suggestions for a pull request.",
     `Repository: ${input.repository}`,
     `Pull request: #${input.pullRequestNumber} ${input.pullRequestTitle}`,
+    buildAdditionalContext(input),
     "Return JSON with key `items` as 3-6 practical regression tests."
-  ].join("\n");
+  ]
+    .filter((part) => part.length > 0)
+    .join("\n");
 }
 
 export function buildFollowUpPrompt(input: PullRequestReviewWorkflowInput): string {
@@ -40,8 +49,27 @@ export function buildFollowUpPrompt(input: PullRequestReviewWorkflowInput): stri
     "You are proposing follow-up software engineering tasks.",
     `Repository: ${input.repository}`,
     `Pull request: #${input.pullRequestNumber} ${input.pullRequestTitle}`,
+    buildAdditionalContext(input),
     "Return JSON with key `items` for 2-4 follow-up tasks."
-  ].join("\n");
+  ]
+    .filter((part) => part.length > 0)
+    .join("\n");
+}
+
+function buildAdditionalContext(input: PullRequestReviewWorkflowInput): string {
+  const sections: string[] = [];
+
+  if (input.pullRequestBody?.trim()) {
+    sections.push(`Pull request description:\n${input.pullRequestBody.trim()}`);
+  }
+
+  const changedFiles = input.changedFiles?.filter((file) => file.trim().length > 0) ?? [];
+
+  if (changedFiles.length > 0) {
+    sections.push(`Changed files:\n- ${changedFiles.join("\n- ")}`);
+  }
+
+  return sections.join("\n\n");
 }
 
 export async function invokeWithRetries<T>(

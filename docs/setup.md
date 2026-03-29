@@ -18,7 +18,9 @@ pnpm install
 ```bash
 cp .env.example .env
 ```
-3. Enable demo mode (no GitHub credentials needed):
+3. Configure environment:
+- Real mode (recommended): keep `DEMO_MODE=false` and set `GEMINI_API_KEY`, `GITHUB_TOKEN`, `GITHUB_WEBHOOK_SECRET`.
+- Demo mode (optional): set `DEMO_MODE=true`.
 ```bash
 sed -i 's/^DEMO_MODE=.*/DEMO_MODE=true/' .env
 ```
@@ -34,8 +36,7 @@ pnpm test
 ```
 6. Start services:
 ```bash
-pnpm --filter @patchloom/api dev
-pnpm --filter @patchloom/web dev
+pnpm dev
 ```
 
 ## Verification Checklist
@@ -49,6 +50,24 @@ curl -s http://localhost:4000/graphql \
 - With `DEMO_MODE=true`, run list is pre-populated.
 
 ## Optional GitHub Integration
-- Set `GITHUB_TOKEN` for private repo PR URL reading and approved comment publishing.
+- Set `GITHUB_TOKEN` for real PR lookup, webhook enrichment, and approved comment publishing.
 - Set `GITHUB_WEBHOOK_SECRET` if using `/webhooks/github`.
 - Keep `DEMO_MODE=true` for local exploration; set `DEMO_MODE=false` for pure external-trigger behavior.
+
+## Optional ngrok Tunnel
+Use this when testing GitHub webhooks against local API:
+
+1. `cp ngrok.example.yml ngrok.yml`
+2. Set in `.env`:
+   - `NGROK_ENABLED=true`
+   - `NGROK_AUTHTOKEN=<your-token>`
+3. Start API:
+```bash
+pnpm --filter @patchloom/api dev
+```
+4. Start tunnel:
+```bash
+pnpm ngrok:start
+```
+5. Configure GitHub webhook payload URL:
+   - `https://<your-ngrok-domain>/webhooks/github`

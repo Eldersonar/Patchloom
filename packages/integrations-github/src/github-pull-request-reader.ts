@@ -5,14 +5,25 @@ export interface ParsedPullRequestUrl {
 }
 
 export interface GitHubPullRequestDetails {
+  changedFiles: string[];
+  pullRequestBody: string;
   pullRequestNumber: number;
   pullRequestTitle: string;
   repository: string;
 }
 
 interface GitHubPullRequestApiResponse {
+  body?: string | null;
   number?: number;
   title?: string;
+}
+
+interface GitHubPullRequestFileApiResponse {
+  additions?: number;
+  deletions?: number;
+  filename?: string;
+  patch?: string;
+  status?: string;
 }
 
 type FetchLike = typeof fetch;
@@ -83,8 +94,51 @@ export class GitHubTokenPullRequestReader {
     pullRequestUrl: string
   ): Promise<GitHubPullRequestDetails> {
     const parsed = parseGitHubPullRequestUrl(pullRequestUrl);
-    const endpoint = `${this.apiBaseUrl}/repos/${parsed.owner}/${parsed.repository}/pulls/${parsed.pullRequestNumber}`;
+    return this.fetchPullRequest(
+      parsed.owner,
+      parsed.repository,
+      parsed.pullRequestNumber
+    );
+  }
 
+  /**
+   * Fetches pull request details from GitHub for the given repository reference.
+   *
+   * @param owner - Repository owner.
+   * @param repository - Repository name.
+   * @param pullRequestNumber - Pull request number.
+   * @returns Pull request details for workflow run creation.
+   */
+  public async fetchPullRequest(
+    owner: string,
+    repository: string,
+    pullRequestNumber: number
+  ): Promise<GitHubPullRequestDetails> {
+    const endpoint = `${this.apiBaseUrl}/repos/${owner}/${repository}/pulls/${pullRequestNumber}`;
+    const filesEndpoint = `${endpoint}/files?per_page=30`;
+    const [payload, filesPayload] = await Promise.all([
+      this.fetchJson<GitHubPullRequestApiResponse>(endpoint),
+      this.fetchJson<GitHubPullRequestFileApiResponse[]>(filesEndpoint)
+    ]);
+
+    if (!payload.title || !payload.number) {
+      throw new Error("GitHub pull request response missing required fields");
+    }
+
+    const changedFiles = filesPayload
+      .map((file) => this.formatChangedFile(file))
+      .filter((file): file is string => typeof file === "string");
+
+    return {
+      changedFiles,
+      pullRequestBody: payload.body ?? "",
+      pullRequestNumber: payload.number,
+      pullRequestTitle: payload.title,
+      repository: `${owner}/${repository}`
+    };
+  }
+
+  private async fetchJson<TPayload>(endpoint: string): Promise<TPayload> {
     const response = await this.fetchImpl(endpoint, {
       headers: {
         Accept: "application/vnd.github+json",
@@ -101,16 +155,39 @@ export class GitHubTokenPullRequestReader {
       );
     }
 
-    const payload = (await response.json()) as GitHubPullRequestApiResponse;
+    return (await response.json()) as TPayload;
+  }
 
-    if (!payload.title || !payload.number) {
-      throw new Error("GitHub pull request response missing required fields");
+  private formatChangedFile(
+    file: GitHubPullRequestFileApiResponse
+  ): string | null {
+    if (!file.filename) {
+      return null;
     }
 
-    return {
-      pullRequestNumber: payload.number,
-      pullRequestTitle: payload.title,
-      repository: `${parsed.owner}/${parsed.repository}`
-    };
+    const status = file.status ?? "modified";
+    const additions = file.additions ?? 0;
+    const deletions = file.deletions ?? 0;
+    const patchSnippet = this.normalizePatchSnippet(file.patch);
+
+    if (!patchSnippet) {
+      return `${file.filename} (${status}, +${additions}/-${deletions})`;
+    }
+
+    return `${file.filename} (${status}, +${additions}/-${deletions}): ${patchSnippet}`;
+  }
+
+  private normalizePatchSnippet(patch: string | undefined): string | null {
+    if (!patch) {
+      return null;
+    }
+
+    const compact = patch.replace(/\s+/g, " ").trim();
+
+    if (!compact) {
+      return null;
+    }
+
+    return compact.length > 200 ? `${compact.slice(0, 197)}...` : compact;
   }
 }

@@ -9,15 +9,17 @@ Token mode enables:
 - `GITHUB_TOKEN`: token with repository read access (`repo` scope for private repos).
 - `GITHUB_API_URL`: optional override for GitHub Enterprise API base URL.
 - `GITHUB_WEBHOOK_SECRET`: shared secret for validating webhook signatures.
+- `NGROK_ENABLED`: set `true` to use local ngrok helper.
+- `NGROK_AUTHTOKEN`: required when `NGROK_ENABLED=true`.
 
 Default API URL:
 - `https://api.github.com`
 
 ## Manual Trigger Flow
-1. Client calls `startPullRequestReviewFromUrl` with a PR URL.
-2. API parses owner/repo/PR number from the URL.
-3. API reads pull request metadata from GitHub with the configured token.
-4. API starts a normal `startPullRequestReview` workflow run using fetched details.
+1. Client calls `startPullRequestReview` with `repository` + `pullRequestNumber`, or `startPullRequestReviewFromUrl` with a PR URL.
+2. API resolves owner/repo/PR number from the request.
+3. API reads pull request metadata and changed files from GitHub with the configured token.
+4. API starts the workflow run using fetched GitHub details.
 
 ## Comment Publishing Flow
 1. Client fetches run suggestions and approval state.
@@ -39,8 +41,12 @@ Example payloads for offline testing:
 - `docs/examples/webhooks/pull_request.opened.json`
 - `docs/examples/webhooks/issues.opened.json`
 
+Local ngrok helper:
+- `cp ngrok.example.yml ngrok.yml`
+- `pnpm ngrok:start`
+
 ## Notes
-- If `GITHUB_TOKEN` is missing, `startPullRequestReviewFromUrl` returns an explicit configuration error.
+- If `GITHUB_TOKEN` is missing, `startPullRequestReview` and `startPullRequestReviewFromUrl` return explicit configuration errors.
 - If `GITHUB_TOKEN` is missing, `publishComment` returns an explicit configuration error.
 - If `DEMO_MODE=true`, local startup seeds runs without requiring GitHub credentials.
 - Write actions are guarded by full-suggestion approval and idempotency checks.

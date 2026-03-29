@@ -25,7 +25,6 @@ query ListRuns {
     pullRequestNumber
     status
     summary
-    failureReason
     confidence
     suggestions {
       id
@@ -61,6 +60,11 @@ mutation StartRun($input: StartPullRequestReviewInput!) {
   }
 }
 ```
+
+Behavior:
+- Requires `GITHUB_TOKEN` configuration.
+- Performs live GitHub fetch for the specified PR before creating the run.
+- Returns an error when the PR does not exist or cannot be read.
 
 Example variables:
 ```json
@@ -116,7 +120,6 @@ subscription RunUpdated($runId: ID!) {
     id
     status
     summary
-    failureReason
   }
 }
 ```

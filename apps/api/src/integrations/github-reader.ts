@@ -5,7 +5,7 @@ import {
 
 export type GitHubPullRequestReader = Pick<
   GitHubTokenPullRequestReader,
-  "fetchPullRequestByUrl"
+  "fetchPullRequest" | "fetchPullRequestByUrl"
 >;
 export type GitHubCommentPublisher = Pick<
   GitHubTokenCommentPublisher,

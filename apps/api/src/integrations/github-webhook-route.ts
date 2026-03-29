@@ -7,9 +7,11 @@ import {
   verifyGitHubWebhookSignature
 } from "@patchloom/integrations-github";
 
+import type { GitHubPullRequestReader } from "./github-reader";
 import type { InMemoryRunStore } from "../workflow/run-store";
 
 export interface RegisterGitHubWebhookRouteOptions {
+  githubPullRequestReader?: GitHubPullRequestReader | null;
   runStore: InMemoryRunStore;
   webhookSecret?: string;
 }
@@ -29,7 +31,7 @@ export function registerGitHubWebhookRoute(
   app.post(
     "/webhooks/github",
     express.raw({ type: "application/json" }),
-    (request, response) => {
+    async (request, response) => {
       if (!options.webhookSecret) {
         response
           .status(503)
@@ -92,9 +94,38 @@ export function registerGitHubWebhookRoute(
         return;
       }
 
-      const run = options.runStore.startPullRequestReview(
-        normalizedEvent.details
-      );
+      const details = normalizedEvent.details;
+      let reviewInput = details;
+      const reader = options.githubPullRequestReader;
+
+      if (reader) {
+        const parsedRepository = parseFullRepositoryName(details.repository);
+
+        if (!parsedRepository) {
+          response
+            .status(400)
+            .json({ error: "Invalid repository format in webhook payload." });
+          return;
+        }
+
+        try {
+          reviewInput = await reader.fetchPullRequest(
+            parsedRepository.owner,
+            parsedRepository.repository,
+            details.pullRequestNumber
+          );
+        } catch (error) {
+          response.status(400).json({
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to fetch pull request details."
+          });
+          return;
+        }
+      }
+
+      const run = options.runStore.startPullRequestReview(reviewInput);
 
       response.status(202).json({
         runId: run.id,
@@ -102,4 +133,19 @@ export function registerGitHubWebhookRoute(
       });
     }
   );
+}
+
+function parseFullRepositoryName(
+  repository: string
+): { owner: string; repository: string } | null {
+  const segments = repository.split("/").map((part) => part.trim());
+
+  if (segments.length !== 2 || !segments[0] || !segments[1]) {
+    return null;
+  }
+
+  return {
+    owner: segments[0],
+    repository: segments[1]
+  };
 }
