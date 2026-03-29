@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { createGraphQLServer } from "../../src/server";
 import { InMemoryRunStore } from "../../src/workflow/run-store";
+import { InMemoryReviewGovernanceStore } from "../../src/workflow/review-governance-store";
 
 describe("workflow run flow", () => {
   it("creates and fetches pull request review runs", async () => {
     const runStore = new InMemoryRunStore({ autoProgress: false });
+    const reviewGovernanceStore = new InMemoryReviewGovernanceStore();
     const server = createGraphQLServer("0.1.0-test", runStore);
     await server.start();
 
@@ -40,6 +42,7 @@ describe("workflow run flow", () => {
         contextValue: {
           githubPullRequestReader: null,
           requestId: "test-request",
+          reviewGovernanceStore,
           runStore
         }
       }
@@ -90,6 +93,7 @@ describe("workflow run flow", () => {
         contextValue: {
           githubPullRequestReader: null,
           requestId: "test-request",
+          reviewGovernanceStore,
           runStore
         }
       }
@@ -114,6 +118,7 @@ describe("workflow run flow", () => {
         contextValue: {
           githubPullRequestReader: null,
           requestId: "test-request",
+          reviewGovernanceStore,
           runStore
         }
       }

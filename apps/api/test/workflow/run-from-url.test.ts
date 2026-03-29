@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { createGraphQLServer } from "../../src/server";
 import { InMemoryRunStore } from "../../src/workflow/run-store";
+import { InMemoryReviewGovernanceStore } from "../../src/workflow/review-governance-store";
 
 describe("workflow run from URL", () => {
   it("starts a run from GitHub pull request URL", async () => {
     const runStore = new InMemoryRunStore({ autoProgress: false });
+    const reviewGovernanceStore = new InMemoryReviewGovernanceStore();
     const githubPullRequestReader = {
       async fetchPullRequestByUrl() {
         return {
@@ -45,6 +47,7 @@ describe("workflow run from URL", () => {
         contextValue: {
           githubPullRequestReader,
           requestId: "test-request",
+          reviewGovernanceStore,
           runStore
         }
       }
@@ -67,6 +70,7 @@ describe("workflow run from URL", () => {
 
   it("fails when GitHub token integration is not configured", async () => {
     const runStore = new InMemoryRunStore({ autoProgress: false });
+    const reviewGovernanceStore = new InMemoryReviewGovernanceStore();
     const server = createGraphQLServer("0.1.0-test", runStore);
     await server.start();
 
@@ -89,6 +93,7 @@ describe("workflow run from URL", () => {
         contextValue: {
           githubPullRequestReader: null,
           requestId: "test-request",
+          reviewGovernanceStore,
           runStore
         }
       }

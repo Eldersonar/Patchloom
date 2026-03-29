@@ -2,10 +2,12 @@ import { describe, expect, it } from "vitest";
 
 import { createGraphQLServer } from "../src/server";
 import { InMemoryRunStore } from "../src/workflow/run-store";
+import { InMemoryReviewGovernanceStore } from "../src/workflow/review-governance-store";
 
 describe("health query", () => {
   it("returns ok status and app version", async () => {
     const runStore = new InMemoryRunStore({ autoProgress: false });
+    const reviewGovernanceStore = new InMemoryReviewGovernanceStore();
     const server = createGraphQLServer("0.1.0-test", runStore);
     await server.start();
 
@@ -17,6 +19,7 @@ describe("health query", () => {
         contextValue: {
           githubPullRequestReader: null,
           requestId: "test-request",
+          reviewGovernanceStore,
           runStore
         }
       }

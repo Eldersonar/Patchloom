@@ -1,0 +1,137 @@
+:root {
+  --bg: #f5f7fb;
+  --card: #ffffff;
+  --border: #dbe3f1;
+  --text: #1d2b40;
+  --muted: #4f607a;
+  --accent: #0f6df2;
+  --accent-soft: #dce9ff;
+  --danger: #b62222;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at top, #e8f0ff 0%, var(--bg) 55%);
+  color: var(--text);
+}
+
+.app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: 2rem;
+}
+
+.hero p {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+}
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1rem;
+}
+
+.panel h2 {
+  margin-top: 0;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+}
+
+.form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.form-grid input {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem;
+  font: inherit;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  padding: 0.6rem 0.85rem;
+  font: inherit;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error {
+  color: var(--danger);
+  margin-bottom: 0;
+}
+
+.content {
+  display: grid;
+  grid-template-columns: minmax(240px, 340px) 1fr;
+  gap: 1rem;
+}
+
+.panel--list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.panel--list button {
+  width: 100%;
+  text-align: left;
+  background: #eef3fe;
+  color: var(--text);
+  display: grid;
+  gap: 0.25rem;
+}
+
+.panel--list button.active {
+  background: var(--accent-soft);
+  border: 1px solid #acc8ff;
+}
+
+.panel--detail ul {
+  margin-top: 0.35rem;
+  padding-left: 1rem;
+}
+
+@media (max-width: 900px) {
+  .content {
+    grid-template-columns: 1fr;
+  }
+}
