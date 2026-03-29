@@ -1,0 +1,11 @@
+{
+  "action": "opened",
+  "issue": {
+    "number": 912,
+    "title": "Users are logged out after profile update",
+    "body": "Observed after deploy in staging."
+  },
+  "repository": {
+    "full_name": "acme/payments"
+  }
+}

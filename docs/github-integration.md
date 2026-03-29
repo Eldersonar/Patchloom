@@ -35,7 +35,12 @@ Default API URL:
 5. Supported `pull_request` actions (`opened`, `reopened`, `synchronize`) start workflow runs.
 6. `issues` events are currently normalized and ignored in MVP.
 
+Example payloads for offline testing:
+- `docs/examples/webhooks/pull_request.opened.json`
+- `docs/examples/webhooks/issues.opened.json`
+
 ## Notes
 - If `GITHUB_TOKEN` is missing, `startPullRequestReviewFromUrl` returns an explicit configuration error.
 - If `GITHUB_TOKEN` is missing, `publishComment` returns an explicit configuration error.
+- If `DEMO_MODE=true`, local startup seeds runs without requiring GitHub credentials.
 - Write actions are guarded by full-suggestion approval and idempotency checks.

@@ -1,0 +1,38 @@
+name: Feature request
+description: Suggest an enhancement or new workflow capability.
+title: "[Feature] "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What problem are you trying to solve?
+      placeholder: Current pain point.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What should Patchloom do?
+      placeholder: Desired behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and constraints
+      description: Any technical limits, dependencies, or non-goals.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - API
+        - Web dashboard
+        - AI workflows
+        - GitHub integration
+        - Docs
+        - CI/DevEx
