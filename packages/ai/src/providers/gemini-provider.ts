@@ -19,6 +19,16 @@ interface GeminiResponse {
   }>;
 }
 
+interface GeminiErrorResponse {
+  error?: {
+    details?: Array<{
+      reason?: string;
+    }>;
+    message?: string;
+    status?: string;
+  };
+}
+
 export interface GeminiProviderOptions {
   apiKey: string;
   apiUrl?: string;
@@ -144,7 +154,7 @@ export class GeminiProvider implements ModelProvider {
 
     if (!response.ok) {
       const errorBody = await response.text();
-      throw new Error(`Gemini request failed: ${response.status} ${errorBody}`);
+      throw new Error(this.toProviderErrorMessage(response.status, errorBody));
     }
 
     const body = (await response.json()) as GeminiResponse;
@@ -155,5 +165,28 @@ export class GeminiProvider implements ModelProvider {
     }
 
     return text;
+  }
+
+  private toProviderErrorMessage(statusCode: number, responseBody: string): string {
+    const parsed = this.tryParseError(responseBody);
+    const reason = parsed.error?.details?.[0]?.reason;
+
+    if (reason === "API_KEY_INVALID") {
+      return "Gemini API key is invalid. Set GEMINI_API_KEY to a valid key.";
+    }
+
+    if (parsed.error?.message) {
+      return `Gemini request failed (${statusCode}): ${parsed.error.message}`;
+    }
+
+    return `Gemini request failed (${statusCode}).`;
+  }
+
+  private tryParseError(responseBody: string): GeminiErrorResponse {
+    try {
+      return JSON.parse(responseBody) as GeminiErrorResponse;
+    } catch {
+      return {};
+    }
   }
 }

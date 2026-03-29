@@ -22,6 +22,10 @@ import {
 import { registerGitHubWebhookRoute } from "./integrations/github-webhook-route";
 import { seedDemoRuns } from "./workflow/demo-mode";
 import { InMemoryRunStore } from "./workflow/run-store";
+import {
+  createDeterministicWorkflowExecutor,
+  createModelWorkflowExecutor
+} from "./workflow/default-workflow-executor";
 import { InMemoryReviewGovernanceStore } from "./workflow/review-governance-store";
 
 interface Disposable {
@@ -30,6 +34,9 @@ interface Disposable {
 
 export interface StartApiServerOptions extends CreateGitHubPullRequestReaderOptions {
   demoMode?: boolean;
+  geminiApiKey?: string;
+  geminiModel?: string;
+  modelProvider?: "gemini" | "openai" | "anthropic";
 }
 
 /**
@@ -121,7 +128,15 @@ export async function startApiServer(
   appVersion: string,
   options: StartApiServerOptions = {}
 ): Promise<{ subscriptionUrl: string; url: string }> {
-  const runStore = new InMemoryRunStore();
+  const runStore = new InMemoryRunStore({
+    workflowExecutor: options.demoMode
+      ? createDeterministicWorkflowExecutor()
+      : createModelWorkflowExecutor({
+          geminiApiKey: options.geminiApiKey,
+          geminiModel: options.geminiModel,
+          modelProvider: options.modelProvider ?? "gemini"
+        })
+  });
   const githubCommentPublisher = createGitHubCommentPublisher(options);
   const reviewGovernanceStore = new InMemoryReviewGovernanceStore({
     commentPublisher: githubCommentPublisher
@@ -170,6 +185,7 @@ export async function startApiServer(
   await server.start();
 
   registerGitHubWebhookRoute(app, {
+    githubPullRequestReader,
     runStore,
     webhookSecret: options.githubWebhookSecret
   });

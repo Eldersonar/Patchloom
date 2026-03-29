@@ -1,6 +1,7 @@
 export interface WorkflowRunView {
   confidence: number;
   createdAt: string;
+  failureReason?: string | null;
   followUpTasks: string[];
   id: string;
   pullRequestNumber: number;
@@ -23,6 +24,12 @@ export interface SuggestionView {
   content: string;
   id: string;
   kind: string;
+  sourceRefs: SourceRefView[];
+}
+
+export interface SourceRefView {
+  lineHint?: number | null;
+  path: string;
 }
 
 export interface ApprovalDecisionView {

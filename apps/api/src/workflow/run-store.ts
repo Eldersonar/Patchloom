@@ -4,7 +4,6 @@ import {
   canTransitionRunStatus,
   type RunStatus,
   type StartPullRequestReviewInput,
-  type Suggestion,
   type WorkflowRun
 } from "@patchloom/core";
 import { PubSub } from "graphql-subscriptions";
@@ -13,6 +12,13 @@ import {
   createDefaultWorkflowExecutor,
   type PullRequestReviewWorkflowExecutor
 } from "./default-workflow-executor";
+import {
+  createInitialArtifacts,
+  createSuggestionsFromWorkflowOutput,
+  logRunEvent,
+  serializeError,
+  toFailureReason
+} from "./run-store-helpers";
 
 const RUN_UPDATED_EVENT = "runUpdated";
 
@@ -69,9 +75,10 @@ export class InMemoryRunStore {
     const now = new Date().toISOString();
 
     const run: WorkflowRun = {
-      artifacts: this.createInitialArtifacts(),
+      artifacts: createInitialArtifacts(),
       confidence: 0,
       createdAt: now,
+      failureReason: null,
       followUpTasks: [],
       id: randomUUID(),
       promptVersion: "pr-review-prompts/v1",
@@ -181,54 +188,16 @@ export class InMemoryRunStore {
     });
   }
 
-  private createInitialArtifacts(): WorkflowRun["artifacts"] {
-    return {
-      normalizedOutput: {
-        confidence: 0,
-        followUpTasks: [],
-        risks: [],
-        suggestedTests: [],
-        summary: ""
-      },
-      rawModelResponses: {
-        followUpTasks: "",
-        risks: "",
-        suggestedTests: "",
-        summary: ""
-      }
-    };
-  }
-
-  private createSuggestionsFromWorkflowOutput(
-    run: WorkflowRun,
-    createdAt: string
-  ): Suggestion[] {
-    return [
-      ...run.risks.map((risk) => ({
-        content: risk,
-        createdAt,
-        id: randomUUID(),
-        kind: "risk" as const
-      })),
-      ...run.suggestedTests.map((test) => ({
-        content: test,
-        createdAt,
-        id: randomUUID(),
-        kind: "test" as const
-      })),
-      ...run.followUpTasks.map((task) => ({
-        content: task,
-        createdAt,
-        id: randomUUID(),
-        kind: "follow_up" as const
-      }))
-    ];
-  }
-
   private async executeWorkflow(
     runId: string,
     input: StartPullRequestReviewInput
   ): Promise<void> {
+    logRunEvent("workflow_started", {
+      pullRequestNumber: input.pullRequestNumber,
+      repository: input.repository,
+      runId
+    });
+
     try {
       this.transitionRunStatus(runId, "running");
 
@@ -240,28 +209,38 @@ export class InMemoryRunStore {
       }
 
       const updatedAt = new Date().toISOString();
+      const evidenceBackedOutput = createSuggestionsFromWorkflowOutput(
+        workflowResult.output,
+        updatedAt,
+        input.changedFiles
+      );
       const run: WorkflowRun = {
         ...existingRun,
         artifacts: workflowResult.artifacts,
         confidence: workflowResult.output.confidence,
-        followUpTasks: workflowResult.output.followUpTasks,
+        failureReason: null,
+        followUpTasks: evidenceBackedOutput.followUpTasks,
         promptVersion: workflowResult.output.promptVersion,
-        risks: workflowResult.output.risks,
+        risks: evidenceBackedOutput.risks,
         status: "waiting_for_approval",
-        suggestedTests: workflowResult.output.suggestedTests,
+        suggestedTests: evidenceBackedOutput.suggestedTests,
         summary: workflowResult.output.summary,
+        suggestions: evidenceBackedOutput.suggestions,
         updatedAt,
         workflowVersion: workflowResult.output.workflowVersion
       };
 
-      run.suggestions = this.createSuggestionsFromWorkflowOutput(run, updatedAt);
-
       this.runs.set(runId, run);
       this.publishRunUpdated(run);
+      logRunEvent("workflow_waiting_for_approval", {
+        pullRequestNumber: run.pullRequestNumber,
+        repository: run.repository,
+        runId
+      });
       this.scheduleCompletion(runId);
-    } catch {
+    } catch (error) {
       try {
-        this.transitionRunStatus(runId, "failed");
+        this.markRunFailed(runId, error);
       } catch {
         // Ignore failures for disposed or missing runs in development mode.
       }
@@ -273,12 +252,46 @@ export class InMemoryRunStore {
       this.scheduledTimers.delete(timer);
 
       try {
-        this.transitionRunStatus(runId, "completed");
+        const completedRun = this.transitionRunStatus(runId, "completed");
+        logRunEvent("workflow_completed", {
+          pullRequestNumber: completedRun.pullRequestNumber,
+          repository: completedRun.repository,
+          runId
+        });
       } catch {
         // Ignore failures for disposed or missing runs in development mode.
       }
     }, this.lifecycleDelayMs);
 
     this.scheduledTimers.add(timer);
+  }
+
+  private markRunFailed(runId: string, error: unknown): void {
+    const existingRun = this.runs.get(runId);
+
+    if (!existingRun) {
+      return;
+    }
+
+    if (!canTransitionRunStatus(existingRun.status, "failed")) {
+      throw new Error(`Invalid transition from ${existingRun.status} to failed`);
+    }
+
+    const failedRun: WorkflowRun = {
+      ...existingRun,
+      failureReason: toFailureReason(error),
+      status: "failed",
+      updatedAt: new Date().toISOString()
+    };
+
+    this.runs.set(runId, failedRun);
+    this.publishRunUpdated(failedRun);
+    logRunEvent("workflow_failed", {
+      error: serializeError(error),
+      failureReason: failedRun.failureReason,
+      pullRequestNumber: failedRun.pullRequestNumber,
+      repository: failedRun.repository,
+      runId
+    });
   }
 }

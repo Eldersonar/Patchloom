@@ -1,0 +1,9 @@
+version: "2"
+# authtoken is configured via NGROK_AUTHTOKEN and scripts/start-ngrok.sh
+tunnels:
+  patchloom-api:
+    proto: http
+    addr: 4000
+    inspect: true
+    # Optional: uncomment if you have a reserved domain.
+    # domain: "<YOUR_RESERVED_DOMAIN>.ngrok-free.app"

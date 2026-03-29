@@ -73,14 +73,21 @@ export function verifyGitHubWebhookSignature(
   const expectedDigest = createHmac("sha256", secret).update(rawBody).digest("hex");
   const providedDigest = signatureHeader.slice("sha256=".length);
 
-  if (providedDigest.length !== expectedDigest.length) {
+  if (
+    providedDigest.length !== expectedDigest.length ||
+    !/^[\da-f]+$/i.test(providedDigest)
+  ) {
     return false;
   }
 
-  return timingSafeEqual(
-    Buffer.from(providedDigest, "hex"),
-    Buffer.from(expectedDigest, "hex")
-  );
+  const providedBuffer = Buffer.from(providedDigest, "hex");
+  const expectedBuffer = Buffer.from(expectedDigest, "hex");
+
+  if (providedBuffer.length !== expectedBuffer.length) {
+    return false;
+  }
+
+  return timingSafeEqual(providedBuffer, expectedBuffer);
 }
 
 /**

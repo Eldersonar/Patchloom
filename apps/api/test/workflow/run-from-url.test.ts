@@ -9,8 +9,19 @@ describe("workflow run from URL", () => {
     const runStore = new InMemoryRunStore({ autoProgress: false });
     const reviewGovernanceStore = new InMemoryReviewGovernanceStore();
     const githubPullRequestReader = {
+      async fetchPullRequest() {
+        return {
+          changedFiles: ["src/auth.ts (modified, +12/-4)"],
+          pullRequestBody: "Improve token refresh edge-case handling.",
+          pullRequestNumber: 281,
+          pullRequestTitle: "Improve token refresh edge-case handling",
+          repository: "acme/payments"
+        };
+      },
       async fetchPullRequestByUrl() {
         return {
+          changedFiles: ["src/auth.ts (modified, +12/-4)"],
+          pullRequestBody: "Improve token refresh edge-case handling.",
           pullRequestNumber: 281,
           pullRequestTitle: "Improve token refresh edge-case handling",
           repository: "acme/payments"

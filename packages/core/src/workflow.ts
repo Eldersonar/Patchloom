@@ -23,11 +23,18 @@ export interface Suggestion {
   createdAt: string;
   id: string;
   kind: "risk" | "summary" | "test" | "follow_up";
+  sourceRefs: SuggestionSourceRef[];
+}
+
+export interface SuggestionSourceRef {
+  lineHint?: number;
+  path: string;
 }
 
 export interface WorkflowRun {
   confidence: number;
   createdAt: string;
+  failureReason?: string | null;
   followUpTasks: string[];
   id: string;
   promptVersion: string;
@@ -59,6 +66,8 @@ export interface WorkflowRun {
 }
 
 export interface StartPullRequestReviewInput {
+  changedFiles?: string[];
+  pullRequestBody?: string;
   pullRequestNumber: number;
   pullRequestTitle: string;
   repository: string;

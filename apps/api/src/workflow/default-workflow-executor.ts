@@ -1,6 +1,8 @@
 import {
+  createModelProvider,
   runPullRequestReviewWorkflow,
   type ModelProvider,
+  type ProviderFactoryConfig,
   type PullRequestReviewWorkflowResult,
   type StructuredGenerationRequest,
   type StructuredGenerationResult,
@@ -14,11 +16,11 @@ export type PullRequestReviewWorkflowExecutor = (
 ) => Promise<PullRequestReviewWorkflowResult>;
 
 /**
- * Creates the default workflow executor used by the API in development mode.
+ * Creates deterministic workflow executor for tests and demo mode.
  *
  * @returns Executor that runs deterministic PR-review workflow nodes.
  */
-export function createDefaultWorkflowExecutor(): PullRequestReviewWorkflowExecutor {
+export function createDeterministicWorkflowExecutor(): PullRequestReviewWorkflowExecutor {
   const provider = new DeterministicWorkflowProvider();
 
   return async (input) =>
@@ -26,6 +28,33 @@ export function createDefaultWorkflowExecutor(): PullRequestReviewWorkflowExecut
       input,
       provider
     });
+}
+
+/**
+ * Creates model-backed workflow executor for real PR analysis.
+ *
+ * @param config - Provider factory configuration.
+ * @returns Executor that calls the configured model provider.
+ */
+export function createModelWorkflowExecutor(
+  config: ProviderFactoryConfig
+): PullRequestReviewWorkflowExecutor {
+  const provider = createModelProvider(config);
+
+  return async (input) =>
+    runPullRequestReviewWorkflow({
+      input,
+      provider
+    });
+}
+
+/**
+ * Creates the default deterministic executor used by tests unless overridden.
+ *
+ * @returns Deterministic executor implementation.
+ */
+export function createDefaultWorkflowExecutor(): PullRequestReviewWorkflowExecutor {
+  return createDeterministicWorkflowExecutor();
 }
 
 class DeterministicWorkflowProvider implements ModelProvider {

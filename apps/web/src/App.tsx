@@ -41,8 +41,8 @@ export function App(): ReactElement {
   const [publications, setPublications] = useState<CommentPublicationView[]>([]);
   const [runs, setRuns] = useState<WorkflowRunView[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
-  const [formRepository, setFormRepository] = useState("acme/payments");
-  const [formPullRequestNumber, setFormPullRequestNumber] = useState(302);
+  const [formRepository, setFormRepository] = useState("Eldersonar/Patchloom");
+  const [formPullRequestNumber, setFormPullRequestNumber] = useState(1);
   const [formPullRequestTitle, setFormPullRequestTitle] = useState(
     "Improve auth refresh flow"
   );
@@ -231,7 +231,7 @@ export function App(): ReactElement {
             />
           </label>
           <label>
-            PR Title
+            PR Title (fallback only)
             <input
               value={formPullRequestTitle}
               onChange={(event) => setFormPullRequestTitle(event.target.value)}

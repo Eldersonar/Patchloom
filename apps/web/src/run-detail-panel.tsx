@@ -50,22 +50,45 @@ export function RunDetailPanel(props: RunDetailPanelProps): ReactElement {
       <p>
         <strong>Summary:</strong> {props.run.summary}
       </p>
+      {props.run.status === "failed" && props.run.failureReason ? (
+        <p className="error">
+          <strong>Failure:</strong> {props.run.failureReason}
+        </p>
+      ) : null}
 
       <section>
         <h3>Suggestion Approvals</h3>
         {props.run.suggestions.length === 0 ? <p>No suggestions available.</p> : null}
-        <ul>
+        <ul className="suggestion-list">
           {props.run.suggestions.map((suggestion) => {
             const approval = props.approvalsBySuggestionId[suggestion.id];
+            const kindClass = toKindClass(suggestion.kind);
+            const decisionClass = approval?.decision ?? "pending";
 
             return (
-              <li key={suggestion.id} className="suggestion-item">
-                <p>
-                  <strong>{suggestion.kind}</strong>: {suggestion.content}
+              <li
+                key={suggestion.id}
+                className={`suggestion-item suggestion-item--${kindClass} suggestion-item--${decisionClass}`}
+              >
+                <p className="suggestion-heading">
+                  <span className={`kind-pill kind-pill--${kindClass}`}>
+                    {toKindLabel(suggestion.kind)}
+                  </span>
                 </p>
-                <p className="approval-status">
-                  Decision: {approval?.decision ?? "pending"}
+                <p className="suggestion-content">{suggestion.content}</p>
+                <p className={`approval-status approval-status--${decisionClass}`}>
+                  Decision: {decisionClass}
                 </p>
+                {suggestion.sourceRefs.length > 0 ? (
+                  <p className="source-ref-row">
+                    <strong>Evidence:</strong>{" "}
+                    {suggestion.sourceRefs
+                      .map((ref) =>
+                        ref.lineHint ? `${ref.path}:${ref.lineHint}` : ref.path
+                      )
+                      .join(", ")}
+                  </p>
+                ) : null}
                 <div className="actions actions--inline">
                   <button
                     type="button"
@@ -109,9 +132,9 @@ export function RunDetailPanel(props: RunDetailPanelProps): ReactElement {
         </ul>
       </section>
 
-      <DetailList title="Risks" values={props.run.risks} />
-      <DetailList title="Suggested Tests" values={props.run.suggestedTests} />
-      <DetailList title="Follow-up Tasks" values={props.run.followUpTasks} />
+      <DetailList kind="risk" title="Risks" values={props.run.risks} />
+      <DetailList kind="test" title="Suggested Tests" values={props.run.suggestedTests} />
+      <DetailList kind="follow_up" title="Follow-up Tasks" values={props.run.followUpTasks} />
     </article>
   );
 }
@@ -122,7 +145,11 @@ export function RunDetailPanel(props: RunDetailPanelProps): ReactElement {
  * @param props - Detail section title and item values.
  * @returns Detail list content block.
  */
-function DetailList(props: { title: string; values: string[] }): ReactElement {
+function DetailList(props: {
+  kind: "follow_up" | "risk" | "test";
+  title: string;
+  values: string[];
+}): ReactElement {
   if (props.values.length === 0) {
     return (
       <section>
@@ -135,11 +162,37 @@ function DetailList(props: { title: string; values: string[] }): ReactElement {
   return (
     <section>
       <h3>{props.title}</h3>
-      <ul>
+      <ul className="detail-box-list">
         {props.values.map((value) => (
-          <li key={value}>{value}</li>
+          <li key={value} className={`detail-box detail-box--${props.kind}`}>
+            {value}
+          </li>
         ))}
       </ul>
     </section>
   );
+}
+
+function toKindClass(kind: string): "follow_up" | "risk" | "test" {
+  if (kind === "risk" || kind === "test" || kind === "follow_up") {
+    return kind;
+  }
+
+  return "follow_up";
+}
+
+function toKindLabel(kind: string): string {
+  if (kind === "follow_up") {
+    return "Follow-up";
+  }
+
+  if (kind === "risk") {
+    return "Risk";
+  }
+
+  if (kind === "test") {
+    return "Test";
+  }
+
+  return "Suggestion";
 }

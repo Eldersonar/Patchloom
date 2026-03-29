@@ -106,4 +106,28 @@ describe("GeminiProvider", () => {
       })
     ).rejects.toThrowError();
   });
+
+  it("returns user-friendly message for invalid API key", async () => {
+    const fetchImpl: typeof fetch = async () =>
+      new Response(
+        JSON.stringify({
+          error: {
+            details: [{ reason: "API_KEY_INVALID" }],
+            message: "API key not valid"
+          }
+        }),
+        { status: 400 }
+      );
+
+    const provider = new GeminiProvider({
+      apiKey: "invalid-key",
+      fetchImpl
+    });
+
+    await expect(
+      provider.generateText({
+        prompt: "hello"
+      })
+    ).rejects.toThrowError(/Gemini API key is invalid/);
+  });
 });

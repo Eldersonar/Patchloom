@@ -138,14 +138,77 @@ describe("github webhook route", () => {
     expect(body.status).toBe("ignored");
     expect(runningServer.runStore.listRuns()).toHaveLength(0);
   });
+
+  it("enriches pull request details from GitHub reader when configured", async () => {
+    const runningServer = await startWebhookServer({
+      githubPullRequestReader: {
+        async fetchPullRequest() {
+          return {
+            changedFiles: ["src/auth.ts (modified, +5/-2)"],
+            pullRequestBody: "Refine auth refresh handling.",
+            pullRequestNumber: 302,
+            pullRequestTitle: "Real title from GitHub",
+            repository: "acme/payments"
+          };
+        },
+        async fetchPullRequestByUrl() {
+          throw new Error("Not implemented");
+        }
+      },
+      webhookSecret: "test-secret"
+    });
+    const payload = JSON.stringify({
+      action: "opened",
+      pull_request: {
+        number: 302,
+        title: "Webhook payload title"
+      },
+      repository: {
+        full_name: "acme/payments"
+      }
+    });
+
+    const response = await postWebhook(runningServer.url, {
+      body: payload,
+      deliveryId: "delivery-5",
+      eventName: "pull_request",
+      secret: "test-secret"
+    });
+
+    expect(response.status).toBe(202);
+    expect(runningServer.runStore.listRuns()[0]?.summary).toContain(
+      "Real title from GitHub"
+    );
+  });
 });
 
 async function startWebhookServer(options: {
+  githubPullRequestReader?: {
+    fetchPullRequest: (
+      owner: string,
+      repository: string,
+      pullRequestNumber: number
+    ) => Promise<{
+      changedFiles: string[];
+      pullRequestBody: string;
+      pullRequestNumber: number;
+      pullRequestTitle: string;
+      repository: string;
+    }>;
+    fetchPullRequestByUrl: (pullRequestUrl: string) => Promise<{
+      changedFiles: string[];
+      pullRequestBody: string;
+      pullRequestNumber: number;
+      pullRequestTitle: string;
+      repository: string;
+    }>;
+  };
   webhookSecret?: string;
 }): Promise<RunningWebhookServer> {
   const app = express();
   const runStore = new InMemoryRunStore({ autoProgress: false });
   registerGitHubWebhookRoute(app, {
+    githubPullRequestReader: options.githubPullRequestReader ?? null,
     runStore,
     webhookSecret: options.webhookSecret
   });

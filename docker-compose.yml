@@ -24,3 +24,33 @@ services:
       timeout: 3s
     ports:
       - "6379:6379"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: patchloom-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgres://patchloom:patchloom@postgres:5432/patchloom
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "4000:4000"
+    command: ["pnpm", "--filter", "@patchloom/api", "dev"]
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: patchloom-web
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+    command: ["pnpm", "--filter", "@patchloom/web", "dev"]

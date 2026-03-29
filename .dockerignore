@@ -1,0 +1,8 @@
+.git
+.github
+node_modules
+**/node_modules
+.env
+ngrok.yml
+ai-engineering-workflow-assistant-proposal.md
+implementation-checklist.md

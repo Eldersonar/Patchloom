@@ -8,7 +8,27 @@ describe("workflow run flow", () => {
   it("creates and fetches pull request review runs", async () => {
     const runStore = new InMemoryRunStore({ autoProgress: false });
     const reviewGovernanceStore = new InMemoryReviewGovernanceStore();
-    const server = createGraphQLServer("0.1.0-test", runStore);
+    const githubPullRequestReader = {
+      async fetchPullRequest() {
+        return {
+          changedFiles: ["src/auth.ts (modified, +8/-2)"],
+          pullRequestBody: "Improve auth refresh flow behavior for edge cases.",
+          pullRequestNumber: 21,
+          pullRequestTitle: "Improve auth refresh flow",
+          repository: "acme/service-api"
+        };
+      },
+      async fetchPullRequestByUrl() {
+        throw new Error("Not implemented for this test");
+      }
+    };
+    const server = createGraphQLServer(
+      "0.1.0-test",
+      runStore,
+      undefined,
+      undefined,
+      githubPullRequestReader
+    );
     await server.start();
 
     const mutationResult = await server.executeOperation(
@@ -20,6 +40,7 @@ describe("workflow run flow", () => {
               repository
               pullRequestNumber
               status
+              failureReason
               summary
               confidence
               promptVersion
@@ -40,7 +61,7 @@ describe("workflow run flow", () => {
       },
       {
         contextValue: {
-          githubPullRequestReader: null,
+          githubPullRequestReader,
           requestId: "test-request",
           reviewGovernanceStore,
           runStore
@@ -58,6 +79,7 @@ describe("workflow run flow", () => {
       pullRequestNumber: number;
       repository: string;
       status: string;
+      failureReason: string | null;
       confidence: number;
       promptVersion: string;
       workflowVersion: string;
@@ -68,6 +90,7 @@ describe("workflow run flow", () => {
     expect(createdRun.repository).toBe("acme/service-api");
     expect(createdRun.pullRequestNumber).toBe(21);
     expect(createdRun.status).toBe("queued");
+    expect(createdRun.failureReason).toBeNull();
     expect(createdRun.confidence).toBe(0);
     expect(createdRun.promptVersion).toBe("pr-review-prompts/v1");
     expect(createdRun.workflowVersion).toBe("pr-review-workflow/v1");
@@ -91,7 +114,7 @@ describe("workflow run flow", () => {
       },
       {
         contextValue: {
-          githubPullRequestReader: null,
+          githubPullRequestReader,
           requestId: "test-request",
           reviewGovernanceStore,
           runStore
@@ -116,7 +139,7 @@ describe("workflow run flow", () => {
       },
       {
         contextValue: {
-          githubPullRequestReader: null,
+          githubPullRequestReader,
           requestId: "test-request",
           reviewGovernanceStore,
           runStore
@@ -136,5 +159,50 @@ describe("workflow run flow", () => {
       | undefined;
 
     expect(listedRuns?.length).toBe(1);
+  });
+
+  it("rejects direct startPullRequestReview when GitHub integration is not configured", async () => {
+    const runStore = new InMemoryRunStore({ autoProgress: false });
+    const reviewGovernanceStore = new InMemoryReviewGovernanceStore();
+    const server = createGraphQLServer("0.1.0-test", runStore);
+    await server.start();
+
+    const mutationResult = await server.executeOperation(
+      {
+        query: `
+          mutation Start($input: StartPullRequestReviewInput!) {
+            startPullRequestReview(input: $input) {
+              id
+            }
+          }
+        `,
+        variables: {
+          input: {
+            pullRequestNumber: 1,
+            pullRequestTitle: "Test",
+            repository: "acme/service-api"
+          }
+        }
+      },
+      {
+        contextValue: {
+          githubPullRequestReader: null,
+          requestId: "test-request",
+          reviewGovernanceStore,
+          runStore
+        }
+      }
+    );
+
+    await server.stop();
+    runStore.dispose();
+
+    if (mutationResult.body.kind !== "single") {
+      throw new Error("Expected single response body");
+    }
+
+    expect(mutationResult.body.singleResult.errors?.[0]?.message).toContain(
+      "GitHub token integration is not configured"
+    );
   });
 });
