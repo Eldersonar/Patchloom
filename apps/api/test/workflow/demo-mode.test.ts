@@ -15,7 +15,7 @@ describe("demo mode", () => {
     expect(runIds).toHaveLength(2);
     expect(runs).toHaveLength(2);
     expect(runs.every((run) => run.status === "queued")).toBe(true);
-    expect(runs.map((run) => run.repository)).toEqual([
+    expect(runs.map((run) => run.repository).sort()).toEqual([
       "acme/payments",
       "acme/platform"
     ]);
