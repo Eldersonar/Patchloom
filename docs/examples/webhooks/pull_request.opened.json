@@ -1,0 +1,10 @@
+{
+  "action": "opened",
+  "pull_request": {
+    "number": 281,
+    "title": "Improve auth refresh and profile cache handling"
+  },
+  "repository": {
+    "full_name": "acme/payments"
+  }
+}

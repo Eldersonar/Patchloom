@@ -6,6 +6,7 @@ Open-source, self-hostable assistant for engineering workflows. It provides a Gr
 - Phase 0 foundation is implemented.
 - Phase 1 core API skeleton is implemented.
 - Current API includes run lifecycle transitions, `runUpdated` subscription events, structured PR workflow outputs, and approval-gated GitHub publishing.
+- Demo mode is available for local runs without GitHub credentials.
 
 ## Why This Project Exists
 Engineering teams spend too much time on repetitive coordination around code changes:
@@ -48,10 +49,11 @@ This project aims to automate first-pass analysis while keeping human approval f
 - GitHub token-mode comment publishing for approved suggestions.
 - Web dashboard for starting runs, viewing run list/details, subscribing to live run updates, approving suggestions, and publishing approved comments.
 - Provider-agnostic AI interface with Gemini adapter and factory wiring.
+- Demo mode run seeding for local onboarding without external integrations.
 - DB connection check utility with tests.
 - Initial SQL migration and domain model documentation.
 - Docker Compose setup for Postgres and Redis.
-- CI pipeline for lint, typecheck, and tests.
+- CI pipeline for lint, typecheck, unit tests, and integration tests.
 
 ## Requirements
 - Node.js 22+
@@ -59,6 +61,8 @@ This project aims to automate first-pass analysis while keeping human approval f
 - Docker + Docker Compose
 
 ## Quick Start
+Detailed onboarding guide: [`docs/setup.md`](/home/simon/Documents/personal/Patchloom/docs/setup.md)
+
 1. Install dependencies:
 ```bash
 pnpm install
@@ -67,17 +71,22 @@ pnpm install
 ```bash
 cp .env.example .env
 ```
-3. Start local dependencies:
+3. Optional: enable demo mode for local sample runs:
+```bash
+sed -i 's/^DEMO_MODE=.*/DEMO_MODE=true/' .env
+```
+4. Start local dependencies:
 ```bash
 docker compose up -d
 ```
-4. Validate quality gates:
+5. Validate quality gates:
 ```bash
 pnpm lint
 pnpm typecheck
-pnpm test
+pnpm test:unit
+pnpm test:integration
 ```
-5. Run services:
+6. Run services:
 ```bash
 pnpm --filter @patchloom/api dev
 pnpm --filter @patchloom/web dev
@@ -90,6 +99,7 @@ Required for current scaffold:
 - `APP_VERSION`
 - `NODE_ENV`
 - `PORT`
+- `DEMO_MODE` (enable local seeded runs without GitHub credentials)
 - `MODEL_PROVIDER`
 - `GEMINI_MODEL`
 - `GEMINI_API_KEY`
@@ -105,7 +115,8 @@ Required for current scaffold:
 - Current checks:
   - `pnpm lint`
   - `pnpm typecheck`
-  - `pnpm test`
+  - `pnpm test:unit`
+  - `pnpm test:integration`
 
 ## Agent Compatibility
 The architecture is being built for external agent integration (for example, OpenClaw):
@@ -133,6 +144,19 @@ The architecture is being built for external agent integration (for example, Ope
 - Query `listCommentPublications(runId: ID!)`
 - Subscription `runUpdated(runId: ID!)`
 - `WorkflowRun` now includes `confidence`, `risks`, `suggestedTests`, `followUpTasks`, `promptVersion`, and `workflowVersion`.
+
+## Documentation
+- Setup: [`docs/setup.md`](/home/simon/Documents/personal/Patchloom/docs/setup.md)
+- Architecture: [`docs/architecture.md`](/home/simon/Documents/personal/Patchloom/docs/architecture.md)
+- API guide: [`docs/api.md`](/home/simon/Documents/personal/Patchloom/docs/api.md)
+- Domain model: [`docs/domain-model.md`](/home/simon/Documents/personal/Patchloom/docs/domain-model.md)
+- GitHub integration: [`docs/github-integration.md`](/home/simon/Documents/personal/Patchloom/docs/github-integration.md)
+- Subscription usage: [`docs/subscriptions.md`](/home/simon/Documents/personal/Patchloom/docs/subscriptions.md)
+- Example webhook payloads: `docs/examples/webhooks/*.json`
+
+## Contributing
+- Contribution guide: [`CONTRIBUTING.md`](/home/simon/Documents/personal/Patchloom/CONTRIBUTING.md)
+- Use GitHub issue templates for bugs and feature requests.
 
 ## Subscriptions
 - HTTP endpoint: `http://localhost:4000/graphql`
