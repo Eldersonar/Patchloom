@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: patchloom-postgres
+    environment:
+      POSTGRES_DB: patchloom
+      POSTGRES_PASSWORD: patchloom
+      POSTGRES_USER: patchloom
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U patchloom -d patchloom"]
+      interval: 5s
+      retries: 5
+      timeout: 5s
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: patchloom-redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 5
+      timeout: 3s
+    ports:
+      - "6379:6379"

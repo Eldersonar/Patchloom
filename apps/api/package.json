@@ -1,0 +1,17 @@
+{
+  "name": "@patchloom/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "lint": "eslint src test",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@apollo/server": "^5.0.0",
+    "@patchloom/config": "workspace:*",
+    "graphql": "^16.11.0"
+  }
+}
