@@ -12,6 +12,10 @@ import {
   invokeWithRetries,
   normalizeConfidence
 } from "./pr-review-workflow-helpers";
+import {
+  refineGeneratedItems,
+  refineSummary
+} from "./pr-review-normalization";
 
 export interface PullRequestReviewWorkflowInput {
   changedFiles?: string[];
@@ -75,7 +79,7 @@ export async function generateSummaryNode(
 
   return {
     raw,
-    summary: raw.text.trim()
+    summary: refineSummary(raw.text)
   };
 }
 
@@ -100,7 +104,10 @@ export async function generateRisksNode(
 
   return {
     raw,
-    risks: raw.data.items
+    risks: refineGeneratedItems(raw.data.items, {
+      maxItems: 4,
+      maxLength: 180
+    })
   };
 }
 
@@ -128,7 +135,10 @@ export async function generateSuggestedTestsNode(
 
   return {
     raw,
-    suggestedTests: raw.data.items
+    suggestedTests: refineGeneratedItems(raw.data.items, {
+      maxItems: 5,
+      maxLength: 180
+    })
   };
 }
 
@@ -155,7 +165,10 @@ export async function generateFollowUpTasksNode(
   });
 
   return {
-    followUpTasks: raw.data.items,
+    followUpTasks: refineGeneratedItems(raw.data.items, {
+      maxItems: 3,
+      maxLength: 180
+    }),
     raw
   };
 }
@@ -172,17 +185,17 @@ export function calculateConfidence(input: {
   suggestedTests: string[];
   summary: string;
 }): number {
-  let score = 0.35;
+  let score = 0.3;
 
-  score += Math.min(input.risks.length, 5) * 0.08;
-  score += Math.min(input.suggestedTests.length, 6) * 0.05;
-  score += Math.min(input.followUpTasks.length, 4) * 0.04;
+  score += Math.min(input.risks.length, 4) * 0.08;
+  score += Math.min(input.suggestedTests.length, 5) * 0.05;
+  score += Math.min(input.followUpTasks.length, 3) * 0.04;
 
   if (input.summary.trim().length >= 80) {
     score += 0.08;
   }
 
-  return normalizeConfidence(score);
+  return normalizeConfidence(Math.min(score, 0.9));
 }
 
 /**

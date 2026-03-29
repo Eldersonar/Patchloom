@@ -44,7 +44,8 @@ export function buildSummaryPrompt(input: PullRequestReviewWorkflowInput): strin
     `Repository: ${input.repository}`,
     `Pull request: #${input.pullRequestNumber} ${input.pullRequestTitle}`,
     buildAdditionalContext(input),
-    "Return a concise summary in 2-3 sentences."
+    "Return a concise summary in 2-3 sentences.",
+    "Rules: use only provided context, avoid speculation, mention changed areas explicitly."
   ]
     .filter((part) => part.length > 0)
     .join("\n");
@@ -56,7 +57,9 @@ export function buildRisksPrompt(input: PullRequestReviewWorkflowInput): string 
     `Repository: ${input.repository}`,
     `Pull request: #${input.pullRequestNumber} ${input.pullRequestTitle}`,
     buildAdditionalContext(input),
-    "Return JSON with key `items` as a list of 3-5 concrete risk areas."
+    "Return JSON with key `items` as a list of 2-4 concrete risk areas.",
+    "Rules: plain string items only, each item <= 180 chars, avoid generic security boilerplate.",
+    "Each risk must be traceable to provided files/description."
   ]
     .filter((part) => part.length > 0)
     .join("\n");
@@ -70,7 +73,8 @@ export function buildSuggestedTestsPrompt(
     `Repository: ${input.repository}`,
     `Pull request: #${input.pullRequestNumber} ${input.pullRequestTitle}`,
     buildAdditionalContext(input),
-    "Return JSON with key `items` as 3-6 practical regression tests."
+    "Return JSON with key `items` as 3-5 practical regression tests.",
+    "Rules: plain string items only, each item <= 180 chars, focus on changed behavior."
   ]
     .filter((part) => part.length > 0)
     .join("\n");
@@ -82,7 +86,8 @@ export function buildFollowUpPrompt(input: PullRequestReviewWorkflowInput): stri
     `Repository: ${input.repository}`,
     `Pull request: #${input.pullRequestNumber} ${input.pullRequestTitle}`,
     buildAdditionalContext(input),
-    "Return JSON with key `items` for 2-4 follow-up tasks."
+    "Return JSON with key `items` for 2-3 follow-up tasks.",
+    "Rules: plain string items only, each item <= 180 chars, no duplicate ideas from risks/tests."
   ]
     .filter((part) => part.length > 0)
     .join("\n");

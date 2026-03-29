@@ -5,6 +5,7 @@ Open-source, self-hostable assistant for engineering workflows. It provides a Gr
 ## Current Capabilities
 - GraphQL run lifecycle APIs with real-time `runUpdated` subscriptions.
 - Structured PR review outputs (summary, risks, suggested tests, follow-up tasks).
+- Output refinement for concise summaries and de-duplicated suggestions.
 - Human approval flow before publishing comments.
 - GitHub token-mode manual trigger + webhook ingestion with real PR fetch.
 - Demo mode (`DEMO_MODE=true`) for local onboarding without GitHub credentials.
@@ -206,6 +207,7 @@ The architecture is being built for external agent integration (for example, Ope
 - Start PR review runs from the browser.
 - View run list with status and repository context.
 - View structured run details (summary, risks, suggested tests, follow-up tasks).
+- Color-coded suggestion and detail cards by kind (risk/test/follow-up).
 - Receive live status/detail updates through GraphQL `runUpdated` subscriptions.
 - Approve/reject generated suggestions from run details.
 - Publish approved summary comments to GitHub pull requests.

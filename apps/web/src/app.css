@@ -7,6 +7,15 @@
   --accent: #0f6df2;
   --accent-soft: #dce9ff;
   --danger: #b62222;
+  --risk-border: #efb4b4;
+  --risk-bg: #fff1f1;
+  --test-border: #a7c8ff;
+  --test-bg: #eef5ff;
+  --followup-border: #f2d59a;
+  --followup-bg: #fff8e8;
+  --approved: #1f7a42;
+  --rejected: #9a2a2a;
+  --pending: #66542f;
 }
 
 * {
@@ -135,15 +144,117 @@ button:disabled {
 }
 
 .suggestion-item {
-  border: 1px solid var(--border);
+  border: 1px solid;
   border-radius: 12px;
   margin-bottom: 0.6rem;
   padding: 0.7rem;
+  list-style: none;
+}
+
+.suggestion-list {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+}
+
+.suggestion-item--risk {
+  background: var(--risk-bg);
+  border-color: var(--risk-border);
+}
+
+.suggestion-item--test {
+  background: var(--test-bg);
+  border-color: var(--test-border);
+}
+
+.suggestion-item--follow_up {
+  background: var(--followup-bg);
+  border-color: var(--followup-border);
+}
+
+.suggestion-item--approved {
+  box-shadow: inset 0 0 0 1px rgba(31, 122, 66, 0.18);
+}
+
+.suggestion-item--rejected {
+  box-shadow: inset 0 0 0 1px rgba(154, 42, 42, 0.18);
+}
+
+.suggestion-heading {
+  margin: 0 0 0.35rem;
+}
+
+.suggestion-content {
+  margin: 0 0 0.35rem;
+}
+
+.kind-pill {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+}
+
+.kind-pill--risk {
+  background: #ffd9d9;
+  color: #8f1a1a;
+}
+
+.kind-pill--test {
+  background: #d7e8ff;
+  color: #134f9e;
+}
+
+.kind-pill--follow_up {
+  background: #ffeac0;
+  color: #7a5400;
 }
 
 .approval-status {
-  color: var(--muted);
+  font-size: 0.9rem;
   margin: 0;
+}
+
+.approval-status--approved {
+  color: var(--approved);
+}
+
+.approval-status--rejected {
+  color: var(--rejected);
+}
+
+.approval-status--pending {
+  color: var(--pending);
+}
+
+.detail-box-list {
+  display: grid;
+  gap: 0.5rem;
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+}
+
+.detail-box {
+  border: 1px solid;
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+}
+
+.detail-box--risk {
+  background: var(--risk-bg);
+  border-color: var(--risk-border);
+}
+
+.detail-box--test {
+  background: var(--test-bg);
+  border-color: var(--test-border);
+}
+
+.detail-box--follow_up {
+  background: var(--followup-bg);
+  border-color: var(--followup-border);
 }
 
 @media (max-width: 900px) {

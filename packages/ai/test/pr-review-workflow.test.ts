@@ -60,24 +60,6 @@ class StubModelProvider implements ModelProvider {
   private resolvePayload(prompt: string): { items: unknown[] } {
     const lowerPrompt = prompt.toLowerCase();
 
-    if (lowerPrompt.includes("risk")) {
-      if (this.objectListMode) {
-        return {
-          items: [
-            { text: "Token expiry edge case on refresh boundary." },
-            { text: "Stale profile cache after logout/login." }
-          ]
-        };
-      }
-
-      return {
-        items: [
-          "Token expiry edge case on refresh boundary.",
-          "Stale profile cache after logout/login."
-        ]
-      };
-    }
-
     if (lowerPrompt.includes("test suggestions")) {
       if (this.objectListMode) {
         return {
@@ -95,6 +77,42 @@ class StubModelProvider implements ModelProvider {
         items: [
           "Regression test for token refresh when refresh token expires.",
           "E2E test for logout/login after profile update."
+        ]
+      };
+    }
+
+    if (lowerPrompt.includes("follow-up")) {
+      if (this.objectListMode) {
+        return {
+          items: [
+            { content: "Add follow-up issue for cache invalidation assumptions." },
+            { content: "Document auth refresh rollback procedure." }
+          ]
+        };
+      }
+
+      return {
+        items: [
+          "Add follow-up issue for cache invalidation assumptions.",
+          "Document auth refresh rollback procedure."
+        ]
+      };
+    }
+
+    if (lowerPrompt.includes("risk")) {
+      if (this.objectListMode) {
+        return {
+          items: [
+            { text: "Token expiry edge case on refresh boundary." },
+            { text: "Stale profile cache after logout/login." }
+          ]
+        };
+      }
+
+      return {
+        items: [
+          "Token expiry edge case on refresh boundary.",
+          "Stale profile cache after logout/login."
         ]
       };
     }
@@ -188,7 +206,7 @@ describe("pr-review-workflow", () => {
         "Summary text that is long enough to exercise deterministic confidence normalization."
     });
 
-    expect(confidence).toBe(0.95);
+    expect(confidence).toBe(0.9);
   });
 
   it("normalizes object list items returned by provider", async () => {
