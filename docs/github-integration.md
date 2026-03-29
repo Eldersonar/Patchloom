@@ -1,7 +1,9 @@
 # GitHub Integration (Token Mode)
 
 ## Purpose
-Token mode enables read-only pull request access for manual workflow triggers.
+Token mode enables:
+- read access for manual workflow triggers and webhook-driven runs
+- write access for approval-gated PR comment publishing
 
 ## Required Environment
 - `GITHUB_TOKEN`: token with repository read access (`repo` scope for private repos).
@@ -17,6 +19,14 @@ Default API URL:
 3. API reads pull request metadata from GitHub with the configured token.
 4. API starts a normal `startPullRequestReview` workflow run using fetched details.
 
+## Comment Publishing Flow
+1. Client fetches run suggestions and approval state.
+2. Client approves all suggestions via `approveSuggestion`.
+3. Client calls `publishComment` with run ID, PR URL target, and idempotency key.
+4. API rejects publish when any suggestion is still unapproved.
+5. API posts the comment to GitHub and stores `commentId` + `publishedUrl`.
+6. Reusing the same `idempotencyKey` returns the existing publication record.
+
 ## Webhook Flow
 1. Configure GitHub webhook to `POST /webhooks/github`.
 2. API validates `X-Hub-Signature-256` with `GITHUB_WEBHOOK_SECRET`.
@@ -27,4 +37,5 @@ Default API URL:
 
 ## Notes
 - If `GITHUB_TOKEN` is missing, `startPullRequestReviewFromUrl` returns an explicit configuration error.
-- This mode is read-only; write actions remain approval-gated and are not enabled in this phase.
+- If `GITHUB_TOKEN` is missing, `publishComment` returns an explicit configuration error.
+- Write actions are guarded by full-suggestion approval and idempotency checks.

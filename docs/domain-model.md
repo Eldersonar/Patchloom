@@ -43,4 +43,6 @@ Fields:
 - `idempotency_key` text unique per run publication attempt
 - `target` text (publication target URL/resource)
 - `body` text (published comment body)
+- `comment_id` text (GitHub comment identifier)
+- `published_url` text (GitHub comment URL)
 - `created_at` timestamptz

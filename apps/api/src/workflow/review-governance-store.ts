@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { type WorkflowRun } from "@patchloom/core";
 
+import type { GitHubCommentPublisher } from "../integrations/github-reader";
 import type { InMemoryRunStore } from "./run-store";
 
 export type SuggestionDecision = "approved" | "rejected";
@@ -24,9 +25,11 @@ export interface ApproveSuggestionInput {
 
 export interface CommentPublication {
   body: string;
+  commentId: string;
   createdAt: string;
   id: string;
   idempotencyKey: string;
+  publishedUrl: string;
   runId: string;
   target: string;
 }
@@ -38,13 +41,28 @@ export interface PublishCommentInput {
   target: string;
 }
 
+export interface ReviewGovernanceStoreOptions {
+  commentPublisher?: GitHubCommentPublisher | null;
+}
+
 /**
  * In-memory approval/publication store for suggestion governance in MVP.
  */
 export class InMemoryReviewGovernanceStore {
+  private readonly commentPublisher: GitHubCommentPublisher | null;
+
   private readonly decisionsByRun = new Map<string, Map<string, ApprovalDecision>>();
 
   private readonly publicationsByRun = new Map<string, Map<string, CommentPublication>>();
+
+  /**
+   * Creates an in-memory governance store.
+   *
+   * @param options - Optional runtime integrations.
+   */
+  public constructor(options: ReviewGovernanceStoreOptions = {}) {
+    this.commentPublisher = options.commentPublisher ?? null;
+  }
 
   /**
    * Approves or rejects a suggestion for a run.
@@ -98,10 +116,10 @@ export class InMemoryReviewGovernanceStore {
    * @param input - Comment publication payload.
    * @returns Existing or newly created publication record.
    */
-  public publishComment(
+  public async publishComment(
     runStore: InMemoryRunStore,
     input: PublishCommentInput
-  ): CommentPublication {
+  ): Promise<CommentPublication> {
     const run = runStore.getRun(input.runId);
 
     if (!run) {
@@ -120,11 +138,24 @@ export class InMemoryReviewGovernanceStore {
 
     ensureAllSuggestionsApproved(run, this.listApprovalDecisions(input.runId));
 
+    if (!this.commentPublisher) {
+      throw new Error(
+        "GitHub comment publisher is not configured. Set GITHUB_TOKEN."
+      );
+    }
+
+    const publishedComment = await this.commentPublisher.publishPullRequestComment({
+      body: input.body,
+      pullRequestUrl: input.target
+    });
+
     const publication: CommentPublication = {
       body: input.body,
+      commentId: publishedComment.commentId,
       createdAt: new Date().toISOString(),
       id: randomUUID(),
       idempotencyKey: input.idempotencyKey,
+      publishedUrl: publishedComment.publishedUrl,
       runId: input.runId,
       target: input.target
     };

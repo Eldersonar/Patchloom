@@ -1,4 +1,10 @@
 export {
+  GitHubTokenCommentPublisher,
+  type GitHubPublishedComment,
+  type GitHubTokenCommentPublisherOptions,
+  type PublishPullRequestCommentInput
+} from "./comment-publisher";
+export {
   GitHubTokenPullRequestReader,
   parseGitHubPullRequestUrl,
   type GitHubPullRequestDetails,

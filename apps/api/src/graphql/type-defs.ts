@@ -40,9 +40,11 @@ export const typeDefs = `#graphql
 
   type CommentPublication {
     body: String!
+    commentId: String!
     createdAt: String!
     id: ID!
     idempotencyKey: String!
+    publishedUrl: String!
     runId: ID!
     target: String!
   }
