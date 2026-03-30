@@ -16,7 +16,6 @@ export {
   generateRisksNode,
   generateSuggestedTestsNode,
   generateSummaryNode,
-  runPullRequestReviewWorkflow,
   type PullRequestReviewArtifacts,
   type PullRequestReviewOutput,
   type PullRequestReviewWorkflowInput,
