@@ -1,6 +1,6 @@
 import {
   createModelProvider,
-  runPullRequestReviewWorkflow,
+  runPullRequestReviewLangGraphWorkflow,
   type ModelProvider,
   type ProviderFactoryConfig,
   type PullRequestReviewWorkflowResult,
@@ -24,7 +24,7 @@ export function createDeterministicWorkflowExecutor(): PullRequestReviewWorkflow
   const provider = new DeterministicWorkflowProvider();
 
   return async (input) =>
-    runPullRequestReviewWorkflow({
+    runPullRequestReviewLangGraphWorkflow({
       input,
       provider
     });
@@ -42,7 +42,7 @@ export function createModelWorkflowExecutor(
   const provider = createModelProvider(config);
 
   return async (input) =>
-    runPullRequestReviewWorkflow({
+    runPullRequestReviewLangGraphWorkflow({
       input,
       provider
     });
