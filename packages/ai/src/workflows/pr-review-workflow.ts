@@ -9,10 +9,7 @@ import {
   buildRisksPrompt,
   buildSuggestedTestsPrompt,
   buildSummaryPrompt,
-  classifyPullRequestType,
-  invokeWithRetries,
-  normalizeConfidence,
-  type PullRequestType
+  normalizeConfidence
 } from "./pr-review-workflow-helpers";
 import {
   refineGeneratedItems,
@@ -59,15 +56,6 @@ export interface PullRequestReviewWorkflowOptions {
   provider: ModelProvider;
   temperature?: number;
   workflowVersion?: string;
-}
-
-interface PullRequestGenerationPolicy {
-  maxFollowUpTasks: number;
-  maxFollowUpTaskLength: number;
-  maxRiskLength: number;
-  maxRisks: number;
-  maxSuggestedTests: number;
-  maxTestLength: number;
 }
 
 /**
@@ -213,130 +201,4 @@ export function calculateConfidence(input: {
   }
 
   return normalizeConfidence(Math.min(score, 0.9));
-}
-
-/**
- * Executes the pull request review workflow in deterministic node order.
- *
- * @param options - Workflow execution options.
- * @returns Output and artifacts from the workflow run.
- */
-export async function runPullRequestReviewWorkflow(
-  options: PullRequestReviewWorkflowOptions
-): Promise<PullRequestReviewWorkflowResult> {
-  const promptVersion = options.promptVersion ?? "pr-review-prompts/v1";
-  const workflowVersion = options.workflowVersion ?? "pr-review-workflow/v1";
-  const maxRetries = options.maxRetries ?? 1;
-  const pullRequestType = classifyPullRequestType(options.input);
-  const policy = getGenerationPolicyByPullRequestType(pullRequestType);
-
-  const summaryNode = await invokeWithRetries(
-    () =>
-      generateSummaryNode(options.provider, options.input, options.temperature),
-    maxRetries
-  );
-  const risksNode = await invokeWithRetries(
-    () =>
-      generateRisksNode(
-        options.provider,
-        options.input,
-        options.temperature,
-        policy.maxRisks,
-        policy.maxRiskLength
-      ),
-    maxRetries
-  );
-  const testsNode = await invokeWithRetries(
-    () =>
-      generateSuggestedTestsNode(
-        options.provider,
-        options.input,
-        options.temperature,
-        policy.maxSuggestedTests,
-        policy.maxTestLength
-      ),
-    maxRetries
-  );
-  const followUpNode = await invokeWithRetries(
-    () =>
-      generateFollowUpTasksNode(
-        options.provider,
-        options.input,
-        options.temperature,
-        policy.maxFollowUpTasks,
-        policy.maxFollowUpTaskLength
-      ),
-    maxRetries
-  );
-
-  const normalizedOutput = {
-    confidence: calculateConfidence({
-      followUpTasks: followUpNode.followUpTasks,
-      risks: risksNode.risks,
-      suggestedTests: testsNode.suggestedTests,
-      summary: summaryNode.summary
-    }),
-    followUpTasks: followUpNode.followUpTasks,
-    risks: risksNode.risks,
-    suggestedTests: testsNode.suggestedTests,
-    summary: summaryNode.summary
-  };
-
-  return {
-    artifacts: {
-      normalizedOutput,
-      rawModelResponses: {
-        followUpTasks: followUpNode.raw.text,
-        risks: risksNode.raw.text,
-        suggestedTests: testsNode.raw.text,
-        summary: summaryNode.raw.text
-      }
-    },
-    output: {
-      ...normalizedOutput,
-      promptVersion,
-      workflowVersion
-    }
-  };
-}
-
-/**
- * Maps pull request type to generation limits.
- *
- * @param pullRequestType - Classified pull request type.
- * @returns Generation policy for risk/test/follow-up caps.
- */
-function getGenerationPolicyByPullRequestType(
-  pullRequestType: PullRequestType
-): PullRequestGenerationPolicy {
-  if (pullRequestType === "scaffold") {
-    return {
-      maxFollowUpTasks: 2,
-      maxFollowUpTaskLength: 170,
-      maxRiskLength: 170,
-      maxRisks: 3,
-      maxSuggestedTests: 4,
-      maxTestLength: 170
-    };
-  }
-
-  if (pullRequestType === "bugfix") {
-    return {
-      maxFollowUpTasks: 2,
-      maxFollowUpTaskLength: 180,
-      maxRiskLength: 180,
-      maxRisks: 4,
-      maxSuggestedTests: 5,
-      maxTestLength: 180
-    };
-  }
-
-  return {
-    maxFollowUpTasks: 3,
-    maxFollowUpTaskLength: 180,
-    maxRiskLength: 180,
-    maxRisks: 4,
-    maxSuggestedTests: 5,
-    maxTestLength: 180
-  };
 }

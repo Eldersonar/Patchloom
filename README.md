@@ -22,7 +22,7 @@ This project aims to automate first-pass analysis while keeping human approval f
 ## Stack
 - Frontend: React + TypeScript (Vite shell for now)
 - Backend: Node.js + TypeScript + Apollo GraphQL
-- AI orchestration target: LangGraph / LangChain
+- AI orchestration: LangGraph + LangChain core runnables
 - Data: PostgreSQL
 - Queue/pubsub/cache: Redis
 - Containers: Docker Compose
@@ -45,6 +45,7 @@ This project aims to automate first-pass analysis while keeping human approval f
 - API GraphQL manual trigger with `startPullRequestReviewFromUrl`.
 - API GraphQL subscription with `runUpdated(runId: ID!)`.
 - PR review workflow nodes producing summary, risks, suggested tests, follow-up tasks, and confidence.
+- LangGraph stateful orchestration runtime for PR review workflow execution.
 - Prompt/workflow version metadata and run artifacts (raw model responses + normalized output) stored in run state.
 - Suggestion approval and publish-governance store with idempotent publication records.
 - In-memory run store for development and test workflows.
